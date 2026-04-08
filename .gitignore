@@ -1,0 +1,9 @@
+.DS_Store
+*.log
+
+# Harvest pipeline ephemeral data
+harvest/.lock
+harvest/.seen.json
+harvest/raw/
+harvest/analyzed/
+harvest/rejected/

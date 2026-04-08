@@ -1,0 +1,73 @@
+{
+  "version": "1.0.0",
+  "enabled": true,
+  "cooldown_minutes": 60,
+
+  "sources": {
+    "web_fetch": {
+      "enabled": true,
+      "targets": [
+        {"name": "GitHub Trending", "url": "https://github.com/trending", "type": "github_trending"},
+        {"name": "GitHub Trending (Shell)", "url": "https://github.com/trending/shell", "type": "github_trending"}
+      ]
+    },
+    "web_search": {
+      "enabled": true,
+      "queries": [
+        "Claude Code best practices 2026",
+        "AI coding assistant workflow automation",
+        "developer harness self-improvement"
+      ]
+    },
+    "manual": {
+      "enabled": true,
+      "description": "/harvest add <URL or description> for manual input"
+    },
+    "internal_feedback": {
+      "enabled": true,
+      "source_dir": "outputs/evaluations/",
+      "pattern": "Lessons Learned"
+    }
+  },
+
+  "fitness_filter": {
+    "threshold": 6,
+    "axes": {
+      "automation": {"weight": 2, "description": "수동 단계를 줄이는가?"},
+      "friction": {"weight": 2, "description": "gotchas.md의 기존 함정을 방지하는가?"},
+      "hard_conversion": {"weight": 2, "description": "bash exit code로 강제할 수 있는가?"},
+      "token_efficiency": {"weight": 2, "description": "프롬프트/컨텍스트를 줄이는가?"},
+      "measurability": {"weight": 2, "description": "단일 지표로 추적 가능한가?"}
+    }
+  },
+
+  "auto_apply": {
+    "min_score": 7,
+    "allowed_types": ["rule", "scaffold-rule"],
+    "max_risk": "low"
+  },
+
+  "measurement": {
+    "command": "bash scripts/harness-report.sh quick",
+    "baseline_file": "harvest/baseline.json"
+  },
+
+  "output": {
+    "provider": "log-only",
+    "log_dir": "harvest/reports/",
+    "notion": {
+      "enabled": false,
+      "database_id": ""
+    },
+    "obsidian": {
+      "enabled": false,
+      "vault_path": "",
+      "folder": "harvest-reports"
+    }
+  },
+
+  "dedup": {
+    "seen_file": "harvest/.seen.json",
+    "ttl_days": 30
+  }
+}

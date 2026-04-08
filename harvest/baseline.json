@@ -1,0 +1,38 @@
+{
+  "score": 63,
+  "max": 100,
+  "mode": "quick",
+  "timestamp": "2026-04-08T04:42:14Z",
+  "breakdown": {
+    "rules": {
+      "score": 13,
+      "max": 20,
+      "detail": "5 files"
+    },
+    "skills": {
+      "score": 20,
+      "max": 20,
+      "detail": "3 skills, 3 with examples"
+    },
+    "hooks": {
+      "score": 15,
+      "max": 15,
+      "detail": "4 hooks, 4 executable"
+    },
+    "templates": {
+      "score": 15,
+      "max": 15,
+      "detail": "11 templates, 8 filled"
+    },
+    "evaluations": {
+      "score": 0,
+      "max": 10,
+      "detail": "0 records"
+    },
+    "test_lint": {
+      "score": 0,
+      "max": 20,
+      "detail": "skipped (quick mode)"
+    }
+  }
+}
