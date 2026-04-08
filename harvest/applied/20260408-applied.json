@@ -1,0 +1,52 @@
+[
+  {
+    "id": "proposal-baseline-test-gate",
+    "title": "Gotcha: verify tests pass BEFORE modifying code",
+    "score": 8,
+    "change_type": "rule",
+    "risk": "low",
+    "target_file": "src/.claude/rules/gotchas.md",
+    "action": "auto-applied",
+    "applied_at": "2026-04-08T07:42:00Z"
+  },
+  {
+    "id": "proposal-feedback-loop-rule",
+    "title": "Gotcha: feed lint/test failures back as correction input",
+    "score": 9,
+    "change_type": "rule",
+    "risk": "low",
+    "target_file": "src/.claude/rules/gotchas.md",
+    "action": "auto-applied",
+    "applied_at": "2026-04-08T07:42:00Z"
+  },
+  {
+    "id": "proposal-chunk-verify-rule",
+    "title": "Gotcha: chunk implementation into verifiable steps",
+    "score": 8,
+    "change_type": "rule",
+    "risk": "low",
+    "target_file": "src/.claude/rules/gotchas.md",
+    "action": "auto-applied",
+    "applied_at": "2026-04-08T07:42:00Z"
+  },
+  {
+    "id": "proposal-symbol-grounded-refs",
+    "title": "Gotcha: use real file paths and symbol names",
+    "score": 7,
+    "change_type": "rule",
+    "risk": "low",
+    "target_file": "src/.claude/rules/gotchas.md",
+    "action": "auto-applied",
+    "applied_at": "2026-04-08T07:42:00Z"
+  },
+  {
+    "id": "proposal-loop-detection",
+    "title": "Gotcha: detect and break retry loops",
+    "score": 10,
+    "change_type": "rule",
+    "risk": "low",
+    "target_file": "src/.claude/rules/gotchas.md",
+    "action": "auto-applied",
+    "applied_at": "2026-04-08T07:42:00Z"
+  }
+]
