@@ -1,0 +1,34 @@
+{
+  "id": "manual-20260410-080500-troubleshooting-guide",
+  "title": "실패 복구 가이드 + diagnose.sh 진단 스크립트",
+  "source": "manual",
+  "source_type": "manual",
+  "trust_level": "high",
+  "target_files": [
+    "src/docs/troubleshooting.md",
+    "src/scripts/diagnose.sh"
+  ],
+  "change_type": "config+scaffold-rule",
+  "risk": "low",
+  "scope_note": "Original scope was doc-only (6/10). User requested enhancement — added diagnose.sh covering all 5 scenarios with exit-code-based detection, raising score to 9/10.",
+  "fitness": {
+    "automation": 2,
+    "friction": 2,
+    "hard_conversion": 2,
+    "token_efficiency": 1,
+    "measurability": 2,
+    "total": 9,
+    "rationale": "diagnose.sh scans 5 failure states with single exit code; troubleshooting.md gives human-readable recovery with §numbering mapped to script checks"
+  },
+  "policy_verdict": "REVIEW_APPROVED",
+  "user_approval": "2026-04-10T08:05Z — enhanced scope with diagnose.sh",
+  "gate2_baseline": 65,
+  "gate2_new_score": 65,
+  "gate2_verdict": "PASS (no regression; scoring dimensions untouched, diagnose.sh counted as script not hook)",
+  "applied_changes": [
+    "src/docs/troubleshooting.md: new file, 5 scenarios (run-task mid-failure, Reviewer REQUEST_CHANGES loop, parallel slice conflict, hook failure, harvest lock stale), each with symptom/diagnosis command/recovery steps",
+    "src/scripts/diagnose.sh: new executable, scans 5 states, exit 0=clean / 1=issues-found, stderr lists issues with §ref to troubleshooting.md",
+    "shellcheck clean, self-test exit 0"
+  ],
+  "applied_at": "2026-04-10T08:08Z"
+}
