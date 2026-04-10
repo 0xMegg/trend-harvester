@@ -20,6 +20,7 @@ set -euo pipefail
 # Configuration
 # ============================================================
 CLAUDE_BIN="${CLAUDE_BIN:-claude}"
+CLAUDE_TOOLS="--allowedTools Write,Read,Edit,Bash,WebFetch,WebSearch,Glob,Grep"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 HARVEST_DIR="$PROJECT_DIR/harvest"
 CONFIG_FILE="$HARVEST_DIR/config.json"
@@ -192,7 +193,7 @@ if [ "$MODE" = "validate" ]; then
 
   # Create raw entry via Claude
   echo "Ingesting manual input..."
-  "$CLAUDE_BIN" -p "Create a harvest raw entry from the following manual input.
+  "$CLAUDE_BIN" $CLAUDE_TOOLS -p "Create a harvest raw entry from the following manual input.
 
 Input: ${VALIDATE_INPUT}
 
@@ -238,7 +239,7 @@ if [ "$MODE" = "full" ] || [ "$MODE" = "scan" ]; then
 
   # Delegate collection to Claude with the trend-harvest skill
   echo "Collecting from configured sources..."
-  "$CLAUDE_BIN" -p "Read harvest/config.json and collect trends from all enabled sources. For each item, output a JSON line to harvest/raw/${RUN_ID}.jsonl with fields: {title, url, description, source_type}. Check harvest/.seen.json for duplicates (by URL hash). Skip duplicates." \
+  "$CLAUDE_BIN" $CLAUDE_TOOLS -p "Read harvest/config.json and collect trends from all enabled sources. For each item, output a JSON line to harvest/raw/${RUN_ID}.jsonl with fields: {title, url, description, source_type}. Check harvest/.seen.json for duplicates (by URL hash). Skip duplicates." \
     --output-format text \
     > "$HARVEST_DIR/raw/${RUN_ID}-collect.log" 2>&1 || true
 
@@ -267,12 +268,12 @@ if [ "$MODE" = "full" ] || [ "$MODE" = "validate" ]; then
   if [ "${item_count:-0}" -gt 0 ]; then
     if [ "$MODE" = "validate" ]; then
       echo "Analyzing manual input with fitness-filter..."
-      "$CLAUDE_BIN" -p "Read harvest/raw/${MANUAL_ID}.json. Apply the fitness-filter skill (5-axis scoring). This is a manual input with trust_level: high. If score >= 6: save to harvest/analyzed/${MANUAL_ID}-passed.json. If score < 6: save to harvest/rejected/${MANUAL_ID}.json with reasons. Read CLAUDE.md, .claude/rules/gotchas.md, and harvest/config.json for context." \
+      "$CLAUDE_BIN" $CLAUDE_TOOLS -p "Read harvest/raw/${MANUAL_ID}.json. Apply the fitness-filter skill (5-axis scoring). This is a manual input with trust_level: high. If score >= 6: save to harvest/analyzed/${MANUAL_ID}-passed.json. If score < 6: save to harvest/rejected/${MANUAL_ID}.json with reasons. Read CLAUDE.md, .claude/rules/gotchas.md, and harvest/config.json for context." \
         --output-format text \
         > "$HARVEST_DIR/analyzed/${MANUAL_ID}-analysis.log" 2>&1 || true
     else
       echo "Analyzing collected items with fitness-filter..."
-      "$CLAUDE_BIN" -p "Read harvest/raw/${RUN_ID}.jsonl. For each item, apply the fitness-filter skill (5-axis scoring). Items scoring >= 6: save to harvest/analyzed/${RUN_ID}-passed.json. Items scoring < 6: save to harvest/rejected/${RUN_ID}-rejected.json with reasons. Read CLAUDE.md, .claude/rules/gotchas.md, and harvest/config.json for context." \
+      "$CLAUDE_BIN" $CLAUDE_TOOLS -p "Read harvest/raw/${RUN_ID}.jsonl. For each item, apply the fitness-filter skill (5-axis scoring). Items scoring >= 6: save to harvest/analyzed/${RUN_ID}-passed.json. Items scoring < 6: save to harvest/rejected/${RUN_ID}-rejected.json with reasons. Read CLAUDE.md, .claude/rules/gotchas.md, and harvest/config.json for context." \
         --output-format text \
         > "$HARVEST_DIR/analyzed/${RUN_ID}-analysis.log" 2>&1 || true
     fi
@@ -363,7 +364,7 @@ if [ "$MODE" = "full" ] || [ "$MODE" = "judge" ] || [ "$MODE" = "validate" ]; th
   fi
 
   echo "Testing proposals with double-gating..."
-  "$CLAUDE_BIN" -p "Read ${JUDGE_TARGET} for proposals that passed Phase 2 (score >= 6). For each proposal:
+  "$CLAUDE_BIN" $CLAUDE_TOOLS -p "Read ${JUDGE_TARGET} for proposals that passed Phase 2 (score >= 6). For each proposal:
 1. Run 'git stash' to save current state
 2. Apply the proposed change temporarily
 3. Run 'bash scripts/harness-report.sh quick' and compare with harvest/baseline.json
@@ -399,7 +400,7 @@ if [ "$MODE" = "full" ] || [ "$MODE" = "validate" ]; then
   fi
 
   echo "Applying approved proposals per harvest-policy.md..."
-  "$CLAUDE_BIN" -p "Read context/harvest-policy.md and ${APPLY_SOURCE} for proposals marked as KEEP.
+  "$CLAUDE_BIN" $CLAUDE_TOOLS -p "Read context/harvest-policy.md and ${APPLY_SOURCE} for proposals marked as KEEP.
 For each proposal:
 - If it meets auto-apply criteria (rule/scaffold-rule, score >= 7, risk low): apply the change and record in harvest/applied/${APPLY_LOG}-applied.json
 - Otherwise: save to harvest/applied/pending-${APPLY_LOG}.json for manual approval
@@ -437,7 +438,7 @@ if [ "$MODE" = "full" ] || [ "$MODE" = "validate" ]; then
   final_score=$(python3 -c "import json; print(json.load(open('$BASELINE_FILE'))['score'])" 2>/dev/null || echo 0)
 
   echo "Generating report..."
-  "$CLAUDE_BIN" -p "Generate a harvest report using templates/harvest-report.md format.
+  "$CLAUDE_BIN" $CLAUDE_TOOLS -p "Generate a harvest report using templates/harvest-report.md format.
 Read harvest/raw/${FILE_GLOB}*, harvest/analyzed/${FILE_GLOB}*, harvest/applied/${FILE_GLOB}*, and harvest/rejected/${FILE_GLOB}*.
 Baseline was ${baseline_score:-0}/100, final is ${final_score}/100, delta is $((${final_score:-0} - ${baseline_score:-0})).
 Write the report to harvest/reports/${REPORT_ID}.md" \
