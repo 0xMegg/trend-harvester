@@ -1,0 +1,43 @@
+{
+  "id": "manual-20260410-084800-mcp-examples-retry",
+  "title": "MCP 실전 설정 예시 + mcp-check.sh 검증 (Item 1 재시도)",
+  "source": "manual",
+  "source_type": "manual",
+  "trust_level": "high",
+  "target_files": [
+    "src/.mcp.json.example",
+    "src/context/mcp-policy.md",
+    "src/scripts/mcp-check.sh",
+    ".gitignore"
+  ],
+  "change_type": "scaffold-rule+config",
+  "risk": "low",
+  "retry_note": "Original Item 1 (2026-04-10 morning batch) was rejected at 6/10 as doc-only scaffold. Enhanced with mcp-check.sh validator mirroring the pattern used for Item 2 (post-edit-size-check) and Item 3 (diagnose.sh). Also corrected the design: Claude Code settings.json schema does NOT permit mcpServers definitions — servers live in .mcp.json at project root.",
+  "fitness": {
+    "automation": 2,
+    "friction": 2,
+    "hard_conversion": 2,
+    "token_efficiency": 1,
+    "measurability": 2,
+    "total": 9,
+    "rationale": "script parses .mcp.json, detects inline secrets (ghp_/sk-/sk-ant-/xoxX-/AKIA...), missing command field, overly wide args scope; exits 1 on violation; single-metric measurable (violation count)"
+  },
+  "policy_verdict": "REVIEW_APPROVED",
+  "user_approval": "2026-04-10T08:48Z — retry with enhancement per user request 'mcp 실전 설정 예시도 개선해서 달 수 있을까'",
+  "gate2_baseline": 65,
+  "gate2_new_score": 65,
+  "gate2_verdict": "PASS (no regression; scoring dimensions untouched by scaffold+script additions)",
+  "applied_changes": [
+    "src/.mcp.json.example: new scaffold with filesystem + github servers, all secrets as ${VAR} placeholders, comment block explaining copy-and-edit workflow",
+    "src/context/mcp-policy.md: 'New MCP Pre-Connection Checklist' appendix corrected to reference .mcp.json (not settings.json, per Claude Code schema), added JSON example + usage steps, notes .mcp.json must be gitignored",
+    "src/scripts/mcp-check.sh: new executable validator — awk-parses mcpServers block from .mcp.json, regex-checks for inline credential literals (5 patterns), verifies command field presence, rejects bare / or ~ args scope, HARVEST_ALLOW_MCP_UNSAFE=1 bypass",
+    ".gitignore: added .mcp.json (prevents token/path leakage)"
+  ],
+  "schema_correction_note": "First attempt put mcpServers in src/.claude/settings.json which failed Claude Code schema validation (Unrecognized fields: mcpServers). Pivoted to .mcp.json.example as the canonical location, which aligns with Claude Code's actual MCP config model (settings.json only stores enabledMcpjsonServers / allowedMcpServers policy).",
+  "self_test_results": {
+    "bash_syntax": "mcp-check.sh OK",
+    "shellcheck": "clean",
+    "unit_tests": "4/4 (clean example PASS, dirty file with 4 violations BLOCK, missing file skip-OK, bypass env var skip-OK)"
+  },
+  "applied_at": "2026-04-10T08:52Z"
+}

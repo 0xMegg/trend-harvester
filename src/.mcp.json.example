@@ -1,0 +1,25 @@
+{
+  "$schema_comment": "Copy to .mcp.json at project root and edit. Secrets MUST be ${VAR} env placeholders — never inline tokens. Validate with: bash scripts/mcp-check.sh",
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "${HOME}/Dev"
+      ],
+      "description": "Local filesystem access — restrict the path to project roots you trust."
+    },
+    "github": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
+      },
+      "description": "GitHub read/write — scope the token to the minimum required permissions."
+    }
+  }
+}

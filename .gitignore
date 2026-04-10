@@ -7,3 +7,6 @@ harvest/.seen.json
 harvest/raw/
 harvest/analyzed/
 harvest/rejected/
+
+# Private MCP config (contains paths/secrets)
+.mcp.json
