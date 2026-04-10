@@ -264,6 +264,32 @@ If Slice B fails in Stage 2:
    ./scripts/run-epic.sh 1  (reuses already completed plan)
 ```
 
+## 병렬 안전장치 (Parallel Safety)
+
+`run-epic.sh`는 병렬 실행 전 다음 두 가지로 slice 충돌을 예방한다.
+
+### 1. Overlap gate (상시 활성)
+Epic plan의 각 slice 블록에 있는 `- **Files:** a.md, b.md` 항목을 파싱해 같은 Stage 내 slice들 사이의 대상 파일 중복을 검사한다. 중복이 발견되면 그 stage는 실행 전 exit 1로 abort된다.
+
+- 파일 목록이 비어 있는 slice는 gate에서 제외 (후방 호환).
+- Epic plan에서 각 slice의 `- **Files:**` 필드를 구체적으로 채워야 효과를 본다.
+- 실패 메시지에 중복 파일과 관련 slice 번호가 함께 나온다.
+
+### 2. Git worktree 격리 (opt-in)
+`HARVEST_PARALLEL_WORKTREE=1`을 설정하면 각 parallel slice가 `.harvest-wt/stage-{N}/slice-{I}/` 경로의 git worktree에서 실행된다.
+
+동작 흐름:
+1. slice 시작 전: `git worktree add` 로 임시 branch `harvest-wt/{RUN_ID}/s{N}/{I}` 생성
+2. slice는 해당 worktree 내에서 실행 (handoff 파일도 worktree로 복사)
+3. slice 완료 후: worktree의 변경을 `git diff --cached`로 패치화해 main 작업 트리에 `git apply --index`로 적용
+4. worktree 제거 + 임시 branch 삭제
+5. 이후 `commit_stage`가 통합 커밋 수행
+
+실패 복구:
+- worktree 생성 실패 시 자동으로 shared tree 방식으로 fallback
+- 잔여 worktree는 `git worktree list`로 확인 후 `git worktree remove --force` + `git worktree prune`
+- `docs/troubleshooting.md §3` 참고
+
 ---
 
 ## Epic Plan Example

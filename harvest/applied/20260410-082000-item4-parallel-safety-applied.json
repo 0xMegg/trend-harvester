@@ -1,0 +1,43 @@
+{
+  "id": "manual-20260410-082000-parallel-overlap-gate-worktree",
+  "title": "병렬 실행 안정성 — overlap gate (상시) + worktree 격리 (opt-in)",
+  "source": "manual",
+  "source_type": "manual",
+  "trust_level": "high",
+  "target_files": [
+    "src/scripts/run-epic.sh",
+    "src/docs/epic-guide.md"
+  ],
+  "change_type": "config",
+  "risk": "medium",
+  "modifies_existing_behavior": true,
+  "policy_note": "modifies run_parallel_stage behavior (adds pre-flight gate + optional worktree wrapper); PENDING path, explicit 2차 승인 완료",
+  "fitness": {
+    "automation": 2,
+    "friction": 2,
+    "hard_conversion": 2,
+    "token_efficiency": 1,
+    "measurability": 2,
+    "total": 9,
+    "rationale": "overlap gate aborts on conflict (exit 1), worktree isolation is per-slice; both observable via logs and worktree dir presence"
+  },
+  "policy_verdict": "PENDING_APPROVED",
+  "user_approval": "2026-04-10T08:20Z — gate 상시 + worktree opt-in",
+  "gate2_baseline": 65,
+  "gate2_new_score": 65,
+  "gate2_verdict": "PASS (no regression)",
+  "applied_changes": [
+    "run-epic.sh parser: added SLICE_FILES[] tracking '- **Files:**' lines per slice, LAST_SLICE_IDX guard",
+    "run-epic.sh: check_slice_overlap() (stage, indices) — parses SLICE_FILES, tmpfile diff, detects duplicates via sort|uniq -d, prints owners, exit 1",
+    "run-epic.sh: WORKTREE_ENABLED flag from HARVEST_PARALLEL_WORKTREE=1, setup_slice_worktree() creates .harvest-wt/stage-N/slice-I + harvest-wt/{RUN_ID}/... branch, copies handoff file into worktree",
+    "run-epic.sh: finalize_slice_worktree() extracts patch via git diff --cached, applies to main tree with git apply --index, removes worktree + branch",
+    "run-epic.sh: run_parallel_stage() calls check_slice_overlap() first (return 1 if conflict), launches slices via subshell with cd to worktree when enabled, merges worktree patches + bring handoff back after batch completes",
+    "epic-guide.md: new '병렬 안전장치 (Parallel Safety)' section documenting gate + worktree opt-in + recovery procedures with ref to docs/troubleshooting.md §3"
+  ],
+  "self_test_results": {
+    "bash_syntax": "run-epic.sh OK",
+    "shellcheck": "clean (pre-existing SC2129 style warning unrelated)",
+    "overlap_gate_unit_test": "3/3 cases (overlap 0,1 BLOCK; no-overlap 0,2 PASS; all-overlap BLOCK)"
+  },
+  "applied_at": "2026-04-10T08:26Z"
+}

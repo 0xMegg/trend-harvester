@@ -287,11 +287,14 @@ if grep -qiE "^#{2,3}\s+Stage\s+[0-9]" "$EPIC_PLAN" 2>/dev/null; then
   HAS_STAGES=true
 fi
 
-# Arrays: SLICES[i] = description, SLICE_STAGE[i] = stage number
+# Arrays: SLICES[i] = description, SLICE_STAGE[i] = stage number,
+# SLICE_FILES[i] = comma-separated target files (for overlap gate)
 SLICES=()
 SLICE_STAGE=()
+SLICE_FILES=()
 CURRENT_STAGE=1
 STAGE_COUNT=1
+LAST_SLICE_IDX=-1
 
 while IFS= read -r line; do
   # Detect Stage headings: ## Stage N or ### Stage N
@@ -314,6 +317,8 @@ while IFS= read -r line; do
     ')
     if [ -n "$SLICE_DESC" ]; then
       SLICES+=("$SLICE_DESC")
+      SLICE_FILES+=("")
+      LAST_SLICE_IDX=$(( ${#SLICES[@]} - 1 ))
       if $HAS_STAGES; then
         SLICE_STAGE+=("$CURRENT_STAGE")
       else
@@ -322,6 +327,13 @@ while IFS= read -r line; do
         STAGE_COUNT=${#SLICES[@]}
       fi
     fi
+    continue
+  fi
+
+  # Detect "- **Files:** a.md, b.md" lines under the most recent slice
+  if [ "$LAST_SLICE_IDX" -ge 0 ] \
+     && [[ "$line" =~ ^[[:space:]]*-[[:space:]]*\*\*[Ff]iles:\*\*[[:space:]]*(.+)$ ]]; then
+    SLICE_FILES[LAST_SLICE_IDX]="${BASH_REMATCH[1]}"
   fi
 done < "$EPIC_PLAN"
 
@@ -377,6 +389,105 @@ echo ""
 # ============================================================
 # Parallel execution helpers
 # ============================================================
+
+# Overlap gate: detect target_files shared by 2+ slices in the same stage.
+# Exits 1 (through caller) if conflicts found. Empty SLICE_FILES entries skipped.
+check_slice_overlap() {
+  local stage_num="$1"
+  shift
+  local indices=("$@")
+
+  local tmpfile
+  tmpfile=$(mktemp -t harvest-overlap.XXXXXX)
+  local has_data=0
+
+  for idx in "${indices[@]}"; do
+    local files="${SLICE_FILES[$idx]:-}"
+    [ -z "$files" ] && continue
+    has_data=1
+    # Strip markdown backticks/brackets, split on comma, trim
+    echo "$files" \
+      | sed 's/`//g; s/\[//g; s/\]//g' \
+      | tr ',' '\n' \
+      | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' \
+      | sed '/^$/d' \
+      | while IFS= read -r f; do
+          echo "${idx}|${f}"
+        done >> "$tmpfile"
+  done
+
+  if [ "$has_data" -eq 0 ]; then
+    # No file lists parsed — rely on human discipline (backward compatible)
+    rm -f "$tmpfile"
+    return 0
+  fi
+
+  local duplicates
+  duplicates=$(awk -F'|' '{print $2}' "$tmpfile" | sort | uniq -d)
+  if [ -n "$duplicates" ]; then
+    echo -e "${RED}[overlap-gate] BLOCK: Stage $stage_num has overlapping target files:${NC}" >&2
+    while IFS= read -r dupfile; do
+      local owners
+      owners=$(awk -F'|' -v f="$dupfile" '$2 == f {print $1}' "$tmpfile" | tr '\n' ' ')
+      echo -e "${RED}  - $dupfile (slices: $owners)${NC}" >&2
+    done <<< "$duplicates"
+    echo -e "${RED}  Edit the epic plan so each file is touched by only one slice per stage.${NC}" >&2
+    rm -f "$tmpfile"
+    return 1
+  fi
+
+  rm -f "$tmpfile"
+  return 0
+}
+
+# Per-slice worktree helpers — opt-in via HARVEST_PARALLEL_WORKTREE=1.
+# Each slice runs in .harvest-wt/stage-N/slice-I on its own branch.
+# After the slice completes, changes are transferred back to the main
+# working tree via `git diff | git apply` (the overlap gate guarantees
+# that multiple slice patches will not collide).
+WORKTREE_ENABLED=0
+if [ "${HARVEST_PARALLEL_WORKTREE:-0}" = "1" ] \
+   && [ "$DRY_RUN" != true ] \
+   && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  WORKTREE_ENABLED=1
+fi
+
+setup_slice_worktree() {
+  local stage_num="$1" idx="$2"
+  [ "$WORKTREE_ENABLED" -ne 1 ] && return 0
+  local wt_dir="$PROJECT_DIR/.harvest-wt/stage-${stage_num}/slice-${idx}"
+  local wt_branch="harvest-wt/${RUN_ID}/s${stage_num}/${idx}"
+  mkdir -p "$(dirname "$wt_dir")"
+  if [ -d "$wt_dir" ]; then
+    git worktree remove --force "$wt_dir" >/dev/null 2>&1 || true
+  fi
+  git worktree add --quiet "$wt_dir" -b "$wt_branch" HEAD >/dev/null 2>&1 \
+    || { echo "[worktree] WARN: cannot create worktree for slice $idx — falling back to shared tree" >&2; return 1; }
+  echo "$wt_dir"
+}
+
+finalize_slice_worktree() {
+  local wt_dir="$1"
+  [ "$WORKTREE_ENABLED" -ne 1 ] && return 0
+  [ -z "$wt_dir" ] && return 0
+  [ -d "$wt_dir" ] || return 0
+
+  # Capture uncommitted changes as patch and apply to main worktree
+  local patch
+  patch=$(mktemp -t harvest-slice-patch.XXXXXX)
+  ( cd "$wt_dir" && git add -A && git diff --cached ) > "$patch" 2>/dev/null
+  if [ -s "$patch" ]; then
+    ( cd "$PROJECT_DIR" && git apply --index "$patch" ) \
+      || echo "[worktree] WARN: failed to apply slice patch from $wt_dir — inspect manually" >&2
+  fi
+  rm -f "$patch"
+
+  # Remove worktree and delete its branch
+  local wt_branch
+  wt_branch=$( ( cd "$wt_dir" && git symbolic-ref --short HEAD 2>/dev/null ) || true)
+  git worktree remove --force "$wt_dir" >/dev/null 2>&1 || true
+  [ -n "$wt_branch" ] && git branch -D "$wt_branch" >/dev/null 2>&1 || true
+}
 
 # Commit all changes from a parallel stage in one consolidated commit
 # Args: stage_number slice_indices...
@@ -481,6 +592,14 @@ run_parallel_stage() {
 
   echo -e "${CYAN}Stage $stage_num: $count slices in parallel (max $MAX_PARALLEL concurrent)${NC}"
 
+  # Overlap gate — refuse to launch if any two slices target the same file
+  if ! check_slice_overlap "$stage_num" "${indices[@]}"; then
+    return 1
+  fi
+
+  # Per-slice worktree bookkeeping (only populated when WORKTREE_ENABLED=1)
+  declare -A SLICE_WT_DIR=()
+
   # Prepare per-task handoff files
   for idx in "${indices[@]}"; do
     local handoff_file="$PROJECT_DIR/handoff/task-slice-${idx}.md"
@@ -518,9 +637,25 @@ run_parallel_stage() {
       if [ "$DRY_RUN" = true ]; then
         dry_flag="--dry-run"
       fi
-      TASK_INDEX="$((idx+1))" TASK_TOTAL="$TOTAL" EPIC_NAME="$EPIC" \
-        "$SCRIPT_DIR/run-task.sh" --task-id "slice-${idx}" --no-commit ${dry_flag:+$dry_flag} "$slice_desc" \
-        > "${task_log_dir}/stdout.log" 2>&1 &
+
+      local slice_cwd="$PROJECT_DIR"
+      if [ "$WORKTREE_ENABLED" -eq 1 ]; then
+        local wt
+        wt=$(setup_slice_worktree "$stage_num" "$idx" 2>/dev/null || true)
+        if [ -n "$wt" ] && [ -d "$wt" ]; then
+          SLICE_WT_DIR[$idx]="$wt"
+          slice_cwd="$wt"
+          # Carry handoff file into the worktree so the slice can read it
+          mkdir -p "$wt/handoff"
+          [ -f "$PROJECT_DIR/handoff/task-slice-${idx}.md" ] \
+            && cp "$PROJECT_DIR/handoff/task-slice-${idx}.md" "$wt/handoff/" 2>/dev/null || true
+        fi
+      fi
+
+      ( cd "$slice_cwd" && \
+        TASK_INDEX="$((idx+1))" TASK_TOTAL="$TOTAL" EPIC_NAME="$EPIC" \
+          "$SCRIPT_DIR/run-task.sh" --task-id "slice-${idx}" --no-commit ${dry_flag:+$dry_flag} "$slice_desc" \
+        ) > "${task_log_dir}/stdout.log" 2>&1 &
 
       pids+=($!)
       pid_to_idx+=("$idx")
@@ -548,6 +683,18 @@ run_parallel_stage() {
 
     batch_start=$batch_end
   done
+
+  # Merge worktree patches back to main working tree and clean up
+  if [ "$WORKTREE_ENABLED" -eq 1 ]; then
+    for idx in "${indices[@]}"; do
+      local wt_dir="${SLICE_WT_DIR[$idx]:-}"
+      [ -n "$wt_dir" ] && finalize_slice_worktree "$wt_dir"
+      # Bring slice's handoff file (if any) back to main tree
+      if [ -n "$wt_dir" ] && [ -f "$wt_dir/handoff/task-slice-${idx}.md" ]; then
+        cp "$wt_dir/handoff/task-slice-${idx}.md" "$PROJECT_DIR/handoff/" 2>/dev/null || true
+      fi
+    done
+  fi
 
   # Report results
   if $all_ok; then
