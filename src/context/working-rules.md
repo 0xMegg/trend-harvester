@@ -98,6 +98,27 @@ Focus over frugality — compose only what is needed.
 - Don't write lengthy entries for common sense that's already being followed
 - Rule files are not better documentation the longer they get — they're short operational documents that reduce recurring mistakes
 
+### 세션 분할 체크리스트
+다음 중 하나라도 해당하면 즉시 handoff 갱신 → 새 세션 시작:
+- [ ] 컨텍스트 70% 이상 사용
+- [ ] 동일 오류가 3회 이상 반복됨
+- [ ] 역할 전환이 필요함 (Planner → Developer 등)
+- [ ] 2시간 이상 경과 (Opus 4.6는 예외지만 task 경계에서 분할 권장)
+- [ ] CLAUDE.md · rules · context 중 다수를 재로드해야 함
+
+전환 전 필수: `handoff/latest.md` 갱신 (What Changed / Current State / What's Next).
+
+### 파일 크기 상한
+`post-edit-size-check.sh` 훅이 편집 후 자동 경고 (경고 전용, block 아님):
+
+| 파일 | 상한 | 이유 |
+|------|------|------|
+| `CLAUDE.md` | 200줄 | 항상 resident, token 비용 직접 |
+| `.claude/rules/*.md` | 50줄 | 항상 resident, 짧은 운영 문서 |
+| `context/*.md` | 150줄 | 자주 참조 (`decision-log.md` 제외) |
+
+초과 시: (1) 분할, (2) 요약, (3) on-demand 이동 중 선택. 한시적 우회는 `HARVEST_ALLOW_OVERSIZE=1`.
+
 ## Evaluation Loop
 Record in the `templates/evaluation.md` format after completing each Task.
 When recurring failure patterns are discovered:

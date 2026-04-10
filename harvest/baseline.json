@@ -2,7 +2,7 @@
   "score": 65,
   "max": 100,
   "mode": "quick",
-  "timestamp": "2026-04-10T02:08:14Z",
+  "timestamp": "2026-04-10T08:03:20Z",
   "breakdown": {
     "rules": {
       "score": 15,
@@ -17,7 +17,7 @@
     "hooks": {
       "score": 15,
       "max": 15,
-      "detail": "4 hooks, 4 executable"
+      "detail": "5 hooks, 5 executable"
     },
     "templates": {
       "score": 15,

@@ -1,0 +1,35 @@
+{
+  "id": "manual-20260410-075620-context-budget-checklist",
+  "title": "Context 예산·세션 분할 체크리스트 + 파일 크기 훅",
+  "source": "manual",
+  "source_type": "manual",
+  "trust_level": "high",
+  "target_files": [
+    "src/context/working-rules.md",
+    "src/.claude/hooks/post-edit-size-check.sh",
+    "src/.claude/settings.json"
+  ],
+  "change_type": "hook+rule",
+  "risk": "low",
+  "scope_note": "Original scope was doc-only (5/10). User expanded to include post-edit-size-check.sh hook at 2차 판단, raising score to 9/10.",
+  "fitness": {
+    "automation": 2,
+    "friction": 2,
+    "hard_conversion": 1,
+    "token_efficiency": 2,
+    "measurability": 2,
+    "total": 9,
+    "rationale": "hook auto-runs on every edit, warns on size budget violation, directly addresses context-bloat gotcha"
+  },
+  "policy_verdict": "REVIEW_APPROVED",
+  "user_approval": "2026-04-10T08:03Z — expanded scope with hook",
+  "gate2_baseline": 65,
+  "gate2_new_score": 65,
+  "gate2_verdict": "PASS (no regression; hooks count 4→5, still maxed at 15/15)",
+  "applied_changes": [
+    "working-rules.md: appended '세션 분할 체크리스트' (5 checkbox triggers) + '파일 크기 상한' table after CLAUDE.md Management section",
+    "post-edit-size-check.sh: new PostToolUse hook, warn-only, scoped to Write|Edit, respects HARVEST_ALLOW_OVERSIZE bypass",
+    "settings.json: registered post-edit-size-check.sh in PostToolUse hooks list"
+  ],
+  "applied_at": "2026-04-10T08:03Z"
+}
