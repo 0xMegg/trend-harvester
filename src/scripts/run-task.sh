@@ -144,6 +144,81 @@ finalize_task_branch() {
   fi
 }
 
+# Create an evaluation stub for the just-finished task. Only fires when the
+# task touched CODE (src/.claude/, src/scripts/, scripts/, src/context/) — pure
+# META tasks (handoff/README/baseline/gitignore) are exempt per the working
+# rules' Evaluation Loop policy. The Reviewer fills in the qualitative fields.
+# See outputs/proposals/proposal-b-eval-enforcement-dry-run.md for why this
+# fires at task-completion instead of commit-time.
+write_evaluation_stub() {
+  [ "$DRY_RUN" = true ] && return 0
+  [ -z "${TASK_NUM:-}" ] && return 0
+
+  # Determine the diff range: prefer the task branch's commits, fall back to
+  # the most recent commit on the original branch.
+  local diff_range
+  if [ -n "${TASK_BRANCH:-}" ] && git rev-parse --verify "${ORIGINAL_BRANCH}" >/dev/null 2>&1; then
+    diff_range="${ORIGINAL_BRANCH}@{1}..${ORIGINAL_BRANCH}"
+  else
+    diff_range="HEAD~1..HEAD"
+  fi
+
+  local files
+  files=$(git diff --name-only "$diff_range" 2>/dev/null || true)
+  [ -z "$files" ] && return 0
+
+  if ! echo "$files" | grep -qE '^(src/\.claude/|src/scripts/.+\.sh|scripts/.+\.sh|src/context/)'; then
+    echo "[eval] task touched no CODE paths — evaluation stub skipped (META-only)"
+    return 0
+  fi
+
+  local eval_dir="$PROJECT_DIR/outputs/evaluations"
+  mkdir -p "$eval_dir"
+  local date_str
+  date_str=$(date +%Y-%m-%d)
+  local slug
+  slug=$(echo "${TASK:-task}" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed -E 's/^-|-$//g' | cut -c1-40)
+  local eval_file="${eval_dir}/${date_str}-task-${TASK_NUM}-${slug}.md"
+
+  if [ -f "$eval_file" ]; then
+    echo "[eval] stub already exists: $eval_file (skipped)"
+    return 0
+  fi
+
+  local file_count
+  file_count=$(echo "$files" | wc -l | tr -d ' ')
+  local diff_stat
+  diff_stat=$(git diff --shortstat "$diff_range" 2>/dev/null | sed -E 's/^ +//' || echo "n/a")
+  local top_files
+  top_files=$(echo "$files" | head -5 | tr '\n' ',' | sed -E 's/,$//')
+
+  local template="$PROJECT_DIR/src/templates/evaluation.md"
+  [ -f "$template" ] || template="$PROJECT_DIR/templates/evaluation.md"
+  if [ -f "$template" ]; then
+    cp "$template" "$eval_file"
+    # Best-effort metadata patch (Mac sed). Failures are non-fatal.
+    sed -i.bak "s|\[YYYY-MM-DD\]|${date_str}|" "$eval_file" 2>/dev/null || true
+    sed -i.bak "s|\[task/N\]|${TASK_BRANCH:-n/a}|" "$eval_file" 2>/dev/null || true
+    sed -i.bak "s|Files touched: \[N\]|Files touched: ${file_count}|" "$eval_file" 2>/dev/null || true
+    sed -i.bak "s|Diff size: \[+lines / -lines\]|Diff size: ${diff_stat}|" "$eval_file" 2>/dev/null || true
+    sed -i.bak "s|\[comma-separated list, top 5\]|${top_files}|" "$eval_file" 2>/dev/null || true
+    rm -f "${eval_file}.bak"
+  else
+    {
+      echo "# Task ${TASK_NUM} — ${TASK:-untitled} (evaluation stub)"
+      echo ""
+      echo "- Date: ${date_str}"
+      echo "- Files touched: ${file_count}"
+      echo "- Diff size: ${diff_stat}"
+      echo "- Files: ${top_files}"
+      echo ""
+      echo "## Lessons Learned"
+      echo "- "
+    } > "$eval_file"
+  fi
+  echo "[eval] stub written: $eval_file"
+}
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -533,6 +608,7 @@ write_status "ROLE=done" "VERDICT=${VERDICT}"
 # ============================================================
 if [ "$VERDICT" = "APPROVE" ]; then
   finalize_task_branch
+  write_evaluation_stub
 fi
 
 # ============================================================
