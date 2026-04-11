@@ -1,3 +1,49 @@
+# Handoff — 2026-04-11 PM-4 (Self-improvement batch: 5 carry-overs closed)
+
+## What Changed (2026-04-11 PM-4)
+PM-3 What's Next 이월 5건 + GitHub rename + 두 repo push까지 한 세션에서 모두 정리.
+
+### 인프라 정리
+- **GitHub repo rename** (`gh repo rename harness-forge --repo 0xMegg/trend-harvester`) → `https://github.com/0xMegg/harness-forge`. 로컬 origin URL 갱신.
+- **두 repo 모두 origin push** 동기화 시작. 이후 모든 PM-4 작업 중 PR 단위로 분리 commit + push 유지.
+
+### 5개 self-improvement 항목 (PR 단위 분리)
+
+| # | 작업 | this repo commits | 결과 |
+|---|---|---|---|
+| 4 | fitness-filter counterexample | `f52746f` | `bad-output.md` 신규 (3 케이스: abstract-proposal, low-fitness 1/10, HARD=0). PM-2 sycophancy 인시던트 보정 anchor. 점수 영향 없음 (calibration only). |
+| 3 | `audit-coherence.sh` 작성 | `ebc89bd` (tool) → `9d330f8` (set -e fix) → `0839362` (harvest-policy sync) | 14-check 정합성 감사기 (HARD core 8 + 6 principles). dogfood가 잡은 진짜 drift 2건 같은 PR에 묶어 fix: src/scripts/diagnose+mcp-check `set -u` → `set -euo pipefail`, src/context/harvest-policy.md "Two-Stage Decision" 섹션 누락 (P3 plan 권장 rationale "Why two stages" 한 단락 동시 처리). |
+| 5 | `verify-parallel-worktree.sh` + run-epic fix | `94e05da` (tool) → `95f4bc6` (fix + .gitignore) | 9-check worktree 격리 smoke test (mktemp 격리 repo). verify가 잡은 진짜 drift 2건 같은 PR에 묶어 fix: `finalize_slice_worktree` leftover `.harvest-wt/stage-N/` 디렉토리 정리 (`rmdir` 2회), `.gitignore` + `src/.gitignore`에 `.harvest-wt/` 등록 (방어선). |
+| 2 | Proposal B dry-run | `d6f38a3` | 30-commit historical replay → **96.7% escape rate** (CODE-only 95%). `outputs/proposals/proposal-b-eval-enforcement-dry-run.md` 보고서. **REJECT 권고** + underlying intent를 1번 항목으로 routing. |
+| 1 | Evaluation Loop 워크플로 명시 | `c6ebd35` (policy+template) → `dcb78d9` (runtime) | working-rules.md 양쪽 sync, 4-anchor (Who/When/For-which/What). `templates/evaluation.md`에 auto-fill metadata + "What I would do differently" 추가. `run-task.sh write_evaluation_stub()` APPROVE 직후 자동 호출 — CODE 매치 시 stub 생성, META-only는 skip, idempotent. |
+
+### Drift fix가 입증한 자가검증 가치
+- audit-coherence.sh가 본 repo는 14/14 PASS인데 src/ target에서 2건 drift 잡음 (P2 set-e + P5 two-stage) → 즉시 수정. 이게 plan 파일이 권장한 "마개조 자가 검증" 효과의 첫 사례.
+- verify-parallel-worktree.sh가 8/9 PASS로 1건 fail → run-epic.sh의 `.harvest-wt/stage-N/` leftover 디렉토리 누적 잠재 버그 발견. 매 epic 실행마다 누적될 수 있던 noise를 사전 차단.
+- **두 도구 모두 작성된 첫 세션에서 진짜 drift를 catch했다는 점이 도구 가치 입증**.
+
+### 정책 cross-reference 보존
+- `working-rules.md` Evaluation Loop 섹션 끝에 "Why this is not a commit-time hook" 단락 추가, dry-run report 경로 박음. 미래 누군가 commit hook을 다시 제안하면 30-commit replay 데이터가 의사결정 history로 남음.
+- `harvest-policy.md` "Two-Stage Decision" 섹션에 PM-2 sycophancy 인시던트 cross-reference (`feedback_scoring_integrity` 메모리). 두 단계가 advisory 아닌 의무인 이유 명시.
+
+### Current State (2026-04-11 PM-4)
+- Baseline: **53/100** (변동 없음 — 모든 변경이 docs/test/calibration/runtime이라 채점 메트릭 영향 없음)
+- this repo: origin/main과 동기화 (clean working tree)
+- target repo: origin/main과 동기화 (clean working tree)
+- GitHub remote URL: **`0xMegg/harness-forge.git`** (rename 완료)
+- 새 도구 (총 2개): `scripts/audit-coherence.sh`, `scripts/verify-parallel-worktree.sh` (양쪽 src/scripts/에도 sync)
+- 새 자동화: `run-task.sh APPROVE` → `write_evaluation_stub` → `outputs/evaluations/{date}-task-{N}-{slug}.md` stub
+- 옛 memory 디렉토리 백업 보존 중 (`-...-trend-harvester/`) — PM-3 결정 그대로
+
+## What's Next (2026-04-11 PM-4)
+- [ ] (선택) 옛 memory 백업 디렉토리 `-...-trend-harvester/` 수동 삭제 — PM-4까지 새 경로 안정화 확인됨
+- [ ] (운영) `write_evaluation_stub` dogfood — 다음 코드 변경 task 실행 시 stub이 정확히 만들어지는지 + Reviewer가 fill 가능한지 실측. 결과 따라 sed 패턴 또는 template field 보정
+- [ ] (선택, P4) audit plan 권장 외부 source 다양성 복원 — RSS 2~3개 (Simon Willison, Latent Space) 추가. trend-harvester 관성 유지 차원
+- [ ] (관찰) audit-coherence.sh 주기 실행 정책 — `/harvest` 풀 파이프라인 직전에 자동 실행하는 게 자연스러움. 다음 harvest 배치 때 수동 확인 후 자동화 결정
+- [ ] (이전부터) harness-report 6+영역 가중치 재설계 (rules 5/20, hooks 11/15 등 여전히 헤드룸 47점 — PM-3 P1 항목, 우선순위 낮음)
+
+---
+
 # Handoff — 2026-04-11 PM-3 (Rename: trend-harvester → harness-forge)
 
 ## What Changed (2026-04-11 PM-3)
