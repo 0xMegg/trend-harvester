@@ -487,6 +487,12 @@ finalize_slice_worktree() {
   wt_branch=$( ( cd "$wt_dir" && git symbolic-ref --short HEAD 2>/dev/null ) || true)
   git worktree remove --force "$wt_dir" >/dev/null 2>&1 || true
   [ -n "$wt_branch" ] && git branch -D "$wt_branch" >/dev/null 2>&1 || true
+
+  # Tidy up empty parent directories left behind by setup_slice_worktree.
+  # rmdir only succeeds when the directory is empty, so this is safe even if
+  # other slices in the same stage are still running.
+  rmdir "$(dirname "$wt_dir")" 2>/dev/null || true
+  rmdir "$PROJECT_DIR/.harvest-wt" 2>/dev/null || true
 }
 
 # Commit all changes from a parallel stage in one consolidated commit

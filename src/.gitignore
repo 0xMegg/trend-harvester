@@ -1,2 +1,5 @@
 .DS_Store
 *.log
+
+# Parallel epic worktree scratch (HARVEST_PARALLEL_WORKTREE=1)
+.harvest-wt/

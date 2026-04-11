@@ -8,5 +8,8 @@ harvest/raw/
 harvest/analyzed/
 harvest/rejected/
 
+# Parallel epic worktree scratch (HARVEST_PARALLEL_WORKTREE=1)
+.harvest-wt/
+
 # Private MCP config (contains paths/secrets)
 .mcp.json
