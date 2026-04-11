@@ -99,14 +99,22 @@ Focus over frugality — compose only what's needed.
 - Rule files aren't longer-is-better manuals — they're short operational documents that reduce recurring failure points
 
 ## Evaluation Loop
-After each Task, record using the `templates/evaluation.md` format.
-When recurring failure patterns are found:
-1. Add as a Known Pitfall to `.claude/rules/gotchas.md`
-2. Add to the relevant Skill's Common Pitfalls
-3. Add automated detection via hooks if needed
 
-Track 5 metrics continuously:
-- Success rate, human edit count, time, token cost, failure type
+Record an evaluation in the `templates/evaluation.md` format after each task that ships code. The loop has four anchors:
+
+1. **Who writes it** — the **Reviewer** role. Same person who runs `commit + push` is the same person who writes the evaluation. Planner and Developer don't.
+2. **When** — immediately after `APPROVE`, before the next task starts. `run-task.sh` auto-creates a stub at `outputs/evaluations/{date}-task-{N}-{slug}.md` so the Reviewer only fills in the qualitative fields.
+3. **For which tasks** — only tasks with **CODE changes** (touching `src/.claude/`, `src/scripts/`, `scripts/`, or `src/context/`). META-only tasks (handoff, README, baseline, gitignore) are exempt — `handoff/latest.md` already covers them.
+4. **What goes in it** — the 5 metrics (success rate, human edits, time, tokens, failure types) plus `Lessons Learned` and `What I would do differently`. Auto-filled metadata (files touched, diff size) is populated by the stub.
+
+When recurring failure patterns appear across evaluations:
+1. Add as a Known Pitfall in `.claude/rules/gotchas.md`
+2. Add to the relevant Skill's Common Pitfalls
+3. Add automatic detection via hooks if necessary
+
+Continuously compare the 5 metrics across evaluations: success rate, human edit volume, time, tokens/cost, failure types.
+
+**Why this is not a commit-time hook**: `outputs/proposals/proposal-b-eval-enforcement-dry-run.md` (2026-04-11) replayed 30 commits and found a 96.7% would-be `[no-eval]` escape rate. The escape becomes the default; the hook becomes theatre. Task-completion enforcement (run-task.sh) hits the actual decision boundary instead.
 
 ## Self-Improvement Loop (Harvest Module)
 An extension of the evaluation loop. Collects external signals, scores them, applies them experimentally, and measures the results.

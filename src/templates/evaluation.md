@@ -3,6 +3,13 @@
 ## Task
 [Task N] — [Task name]
 
+## Auto-filled metadata (run-task.sh stub)
+- Date: [YYYY-MM-DD]
+- Branch: [task/N]
+- Files touched: [N]
+- Diff size: [+lines / -lines]
+- Files: [comma-separated list, top 5]
+
 ## 5 Metrics
 
 ### 1. Success Rate
@@ -33,3 +40,6 @@ Check all that apply:
 
 ## Lessons Learned
 - [Takeaways from this task — record anything that should be reflected in gotchas.md or rules]
+
+## What I would do differently
+- [Reflective note — what should change next time. One bullet is fine; leave blank if nothing stands out]
