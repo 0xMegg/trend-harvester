@@ -1,10 +1,15 @@
 #!/bin/bash
-# Hook: PreToolUse Bash — block `git commit` on main/master.
+# Hook: PreToolUse Bash — block `git commit` on protected branches.
 #
-# Exit 0: not a git commit, not on main, or bypass enabled → allow
-# Exit 2: on main/master and attempting commit → block (Claude surfaces stderr)
+# Protected branches: main, master, dev (dev is the staging branch — task
+# branches are merged into it manually after review, never committed to
+# directly).
 #
-# Bypass: HARVEST_ALLOW_MAIN=1 (emergency / template setup only).
+# Exit 0: not a git commit, not on a protected branch, or bypass enabled → allow
+# Exit 2: on a protected branch and attempting commit → block (Claude surfaces stderr)
+#
+# Bypass: HARVEST_ALLOW_MAIN=1 (emergency / template setup only — name kept
+# for backwards compatibility; covers all protected branches).
 
 set -u
 
@@ -37,9 +42,11 @@ fi
 
 branch=$(git symbolic-ref --short HEAD 2>/dev/null || echo "")
 case "$branch" in
-  main|master)
+  main|master|dev)
     printf '[branch-check] BLOCK: direct commit to "%s" is not allowed.\n' "$branch" >&2
-    printf '[branch-check]   Create a task/epic branch first (run-task.sh handles this automatically).\n' >&2
+    printf '[branch-check]   "%s" is a protected branch — task changes land here only via\n' "$branch" >&2
+    printf '[branch-check]   manual merge of a reviewed task/* branch.\n' >&2
+    printf '[branch-check]   Create a task branch first (run-task.sh handles this automatically).\n' >&2
     printf '[branch-check]   Emergency bypass: HARVEST_ALLOW_MAIN=1 git commit ...\n' >&2
     exit 2
     ;;
