@@ -47,6 +47,13 @@ Approval process:
 - **full mode**: no pause (external collection runs unattended through all phases)
 - **Concreteness pre-filter**: proposals must specify target file, triggering condition, and exact action — abstract proposals are rejected before scoring
 
+## Two-Stage Decision
+- **Stage 1 (Claude)**: collection → concreteness gate → 5-axis scoring → Gate 2 measurement → draft application decision
+- **Stage 2 (User + Claude)**: Claude presents the judgment summary → user reviews and finalizes approval / rejection / modification
+- **All applications must pass Stage 2 before being executed** — including auto-apply candidates. The two-stage rule supersedes any "auto" classification above.
+
+Why two stages: Stage 1 catches mechanical violations (fitness < 6, HARD-BLOCK categories, score regression). Stage 2 catches what scoring cannot see — whether the change actually fits this project right now. LLM scoring is a useful filter but not a sufficient decision-maker, so the human gate is mandatory rather than advisory. This rule originated from a sycophancy incident where score adjustments under user pressure invalidated the filter — see `feedback_scoring_integrity` memory.
+
 ## Rollback
 - Phase 3.5 sandbox: `git stash` → temporary apply → measure → `git checkout -- .` → `git stash pop`
 - Post-apply regression: create a `revert: harvest — [description]` commit
