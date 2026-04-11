@@ -1,88 +1,31 @@
-# Handoff — 2026-04-11 PM (다음 세션 우선 작업)
+# Handoff — 2026-04-11 PM-2 (Hotfix: harness-report fallback 제거)
 
-## 🔴 Priority: harness-report.sh evaluations fallback 결함 + 이번 배치 기록 정정
+## What Changed (2026-04-11 PM-2)
+- **harness-report.sh evaluations fallback 결함 수정** (this repo `c804a71`, target sync `8e94671`).
+  - 기존 코드는 `TARGET_DIR/outputs/evaluations`가 없으면 `PROJECT_DIR/outputs/evaluations`로 fallback. src/ 측정 시 trend-harvester 자체의 `outputs/evaluations/20260410-harvest-e2e.md` 1건이 끼어들어 +2점 인플레이션 발생.
+  - 수정: fallback 루프 삭제, TARGET_DIR만 측정. `scripts/harness-report.sh` + `src/scripts/harness-report.sh` 동시 동기화. shellcheck 통과.
+- **양쪽 측정 결과 일치 확인**: `bash scripts/harness-report.sh quick --target src/` 와 `--target ../claude-code-harness-template/` 모두 **53/100** (둘 다 evaluations 0/10).
+- **Run 20260411-040351 기록 정정** (같은 커밋에 묶음):
+  - `harvest/baseline.json`: 55 → 53, evaluations 2/"1 records" → 0/"0 records"
+  - `harvest/applied/20260411-040351-no-verify-deny-applied.json`: gate2 baseline_score / post_apply_score 53, note에 정정 사실 기록
+  - `harvest/reports/20260411-040351.md`: Measurement / Harness Impact 섹션 정정 + Postscript 추가
+- **거짓 정보 폐기**: 이전 handoff의 "Phase 3의 53은 transient anomaly" 서술은 사실의 반대였음. 실제로는 Phase 3의 53이 production 실측, sandbox 55가 fallback 인공물. 정정 완료.
 
-### 배경 (왜)
+### Current State (2026-04-11 PM-2)
+- Baseline: **53/100** (quick mode, target=src/ — target repo도 동일)
+- Headroom: ~47점
+- src/.claude/settings.json deny: 13 entries (직전 PM 배치의 4 패턴 적용분 그대로 유지)
+- this repo: origin/main 대비 4 commits ahead (baebe9d → 97d9eba → ccefcb9 → c804a71)
+- target repo: origin/main 대비 2 commits ahead (8687b02 → 8e94671)
 
-실무 투입 전 종합 점검에서 score discrepancy 발견:
-- `bash scripts/harness-report.sh quick --target src/` → **55/100**
-- `bash scripts/harness-report.sh quick --target ../claude-code-harness-template/` → **53/100**
-
-차이는 evaluations 영역(2/10 vs 0/10)에서만 발생. 원인은 `scripts/harness-report.sh` evaluations 섹션의 fallback 로직:
-
-```bash
-for candidate in "$TARGET_DIR/outputs/evaluations" "$PROJECT_DIR/outputs/evaluations"; do
-  if [ -d "$candidate" ]; then
-    eval_count=$(find "$candidate" -name '*.md' -type f | wc -l | tr -d ' ')
-    break
-  fi
-done
-```
-
-- src/ 측정 시: `src/outputs/evaluations` 없음 → fallback to `trend-harvester/outputs/evaluations` → `20260410-harvest-e2e.md` 1건 발견 → 2/10 (인공물)
-- target 측정 시: `target/outputs/evaluations` 빈 디렉토리로 존재 → fallback 안 함 → 0/10 (정확)
-
-**결론**: TARGET 측정에 PROJECT 디렉토리를 끌어오는 fallback 자체가 측정 정의 위반. **production 실측 baseline은 53/100이 정답**, src/ 측정의 55는 dev 환경 인공물.
-
-### 부수 결과: 이번 /harvest 배치 기록의 거짓 정보
-
-이번 세션에서 작성된 다음 문서들이 **잘못된 baseline 55를 기준으로 작성됨**:
-- `harvest/baseline.json` (score: 55)
-- `harvest/applied/20260411-040351-no-verify-deny-applied.json` (gate2.baseline_score: 55, post_apply_score: 55)
-- `harvest/reports/20260411-040351.md` ("true baseline 55", "Phase 3 transient anomaly" 서술)
-- `handoff/latest.md` 본 파일의 아래 "Baseline 정정" 문단 ("Phase 3의 53은 transient anomaly로 기록")
-
-특히 **"Phase 3의 53은 transient anomaly" 설명은 거짓**. 실제로는 Phase 3의 53이 정확한 production 측정값이고, Phase 3.5 sandbox에서 나온 55가 fallback 인공물. 정정 필요.
-
-### 작업 순서 (9 step)
-
-1. **`scripts/harness-report.sh` 수정** — evaluations 섹션 fallback 제거. TARGET_DIR/outputs/evaluations 만 측정.
-   - 위치: `scripts/harness-report.sh` 행 350 부근 (`# 7. Evaluations`)
-   - 변경: `for candidate in ... do` 루프 삭제, 단일 경로만 사용
-2. **`src/scripts/harness-report.sh` 동일 수정** — 두 파일 항상 동기화 필요 (이전 handoff 규칙)
-3. **`shellcheck scripts/harness-report.sh src/scripts/harness-report.sh`** 통과 확인
-4. **양쪽 baseline 재측정**
-   ```bash
-   bash scripts/harness-report.sh quick --target src/
-   bash scripts/harness-report.sh quick --target ../claude-code-harness-template/
-   ```
-   양쪽 모두 **53/100**이 나와야 정상 (둘 다 evaluations 0/10)
-5. **`harvest/baseline.json` 정정** — score 55 → 53, evaluations detail "0 records"로
-6. **`harvest/applied/20260411-040351-no-verify-deny-applied.json` 정정**
-   - `gate2.baseline_score`: 55 → 53
-   - `gate2.post_apply_score`: 55 → 53
-   - `gate2.note`: "harness-report does not measure deny list contents — score unchanged but no regression. Baseline corrected from earlier 55 (fallback artifact) to 53 (true production value)."
-7. **`harvest/reports/20260411-040351.md` 정정**
-   - "Rebaseline run (sandbox prep): 55/100" 서술 삭제 또는 정정
-   - "Phase 3 transient anomaly" 서술 → "Phase 3의 53이 정확한 production 측정값. Sandbox에서 본 55는 harness-report.sh fallback 로직 결함으로 인한 인공물 (다음 세션에서 fix)"
-   - Discussion 섹션에 fallback 결함 설명 추가
-8. **양쪽 repo 커밋 + sync**
-   - this repo: `fix: harness-report — evaluations fallback 제거 + Run 20260411-040351 baseline 정정` (script 수정 + 기록 정정 묶어서)
-   - `bash scripts/build-template.sh` 실행
-   - target repo: `chore: template sync — harness-report fallback fix`
-9. **handoff/latest.md 정정 + 이 우선작업 블록 삭제** — 새 "What Changed" 블록으로 대체
-
-### 추가 검증 (선택)
-
-- `outputs/evaluations/` 가 비어 있는 상황에서 production 사용자가 실제로 어떻게 evaluation 파일을 만들지 워크플로 명시 필요. (Proposal B "commit-time eval 강제"가 다시 후보가 될 수 있음.)
-- handoff에 적힌 "Phase 3에서 evaluations 점수가 0이 나왔다가 sandbox 재측정에서 2가 나온 transient 원인 조사" TODO는 이번 fix로 해소됨 — 제거.
-
-### 다음 세션 시작 시 읽을 파일
-
-1. `handoff/latest.md` (이 파일, auto-load)
-2. `scripts/harness-report.sh` (행 345~365 evaluations 섹션)
-3. `src/scripts/harness-report.sh` (동일 섹션)
-4. `harvest/reports/20260411-040351.md` (정정 대상)
-5. `harvest/applied/20260411-040351-no-verify-deny-applied.json` (정정 대상)
-
-### 컨텍스트 (이번 세션 결과 요약)
-
-- Run ID: `20260411-040351`
-- 적용 커밋 (this repo): `baebe9d` — settings.json deny에 `--no-verify` 4 패턴
-- 기록 커밋 (this repo): `97d9eba` — Phase 5 records (이게 정정 대상)
-- target sync 커밋: `8687b02` — settings.json sync
-- 적용 자체는 정상, 적용 결과 기록의 baseline 숫자만 잘못됨
-- 이번 세션 신규 메모리: `feedback_scoring_integrity.md` (점수 challenge 시 원래 근거 우선, 압력 재채점 금지)
+## What's Next (2026-04-11 PM-2)
+- [ ] (검토) `outputs/evaluations/`가 빈 상태로 production 운영되는 상황 — 사용자가 실제로 어떻게 evaluation 파일을 만들 워크플로인지 명시 필요. Proposal B "commit-time eval 강제"가 재후보가 될 수 있음
+- [ ] 보류된 Proposal B (commit-time eval 강제) 실전 친화도 추가 검토 후 재투입 여부 판단 — `[no-eval]` 이스케이프 dry-run
+- [ ] 보류된 Proposal C (retry-counter) 재설계 시에만 재투입
+- [ ] (이전부터) `scripts/audit-coherence.sh` 작성
+- [ ] (이전부터) fitness-filter examples에 counterexample 추가
+- [ ] (이전부터) 병렬 안정성 실전 검증 (`HARVEST_PARALLEL_WORKTREE=1`)
+- [ ] (필요 시) 두 repo 모두 origin push
 
 ---
 
@@ -93,18 +36,17 @@ done
 - 외부 14건 수집 → Phase 2 0/14 통과 → 사용자 push에 따라 재심 → 3건 후보 추출 (A 7/10 RECOMMEND, B 7/10 REVIEW, C 6/10 REVIEW) → A만 적용.
 - **적용 항목**: `src/.claude/settings.json` permissions.deny에 `git commit --no-verify` / `-n` 4개 패턴 추가 (커밋 `baebe9d`).
   - 봉쇄 갭: 기존 PreToolUse/PostToolUse 훅 체인 6종이 `--no-verify` 플래그 1개로 전부 우회 가능했음.
-- **Baseline 정정**: Phase 3 측정에서 53/100이 나왔으나 sandbox 재측정 결과 진짜 값은 **55/100**. 차이는 `evaluations` 영역에서 발생 (project-root fallback `outputs/evaluations/20260410-harvest-e2e.md` 1 record가 갑자기 카운트됨 — 원인 불명, 재현 가능). Phase 3의 53은 transient anomaly로 기록.
+- **Baseline 측정**: Phase 3 production 측정값은 **53/100** (정확). sandbox에서 본 55는 `harness-report.sh` evaluations fallback 결함으로 인한 인공물(`outputs/evaluations/20260410-harvest-e2e.md` 1 record가 PROJECT_DIR fallback으로 카운트됨)이었음 — PM-2 hotfix `c804a71`에서 fallback 제거하고 모든 기록 정정 완료.
 - **Sycophancy 인시던트**: token_efficiency 채점에 대한 사용자 challenge에 즉시 점수를 올렸다가 반려당함. `feedback_scoring_integrity.md` 메모리 추가 (점수 challenge 시 원래 근거 설명이 우선, 압력에 의한 재채점 금지).
 
 ### Current State (2026-04-11 PM)
-- Baseline: **55/100** (quick mode, target=src/)
+- Baseline: **53/100** (quick mode, target=src/) — PM-2 hotfix 후 정확한 production 값
 - src/.claude/settings.json: deny 엔트리 9 → 13
 - 변경 없음: rules/skills/hooks/scripts/templates/guidance/test_lint
-- Headroom: ~45점
+- Headroom: ~47점
 - 미적용 후보 보류: B (commit-time eval 강제, REVIEW), C (retry-counter hook, REVIEW)
 
 ## What's Next (2026-04-11 PM)
-- [ ] Phase 3에서 evaluations 점수가 0이 나왔다가 sandbox 재측정에서 2가 나온 transient 원인 조사 (`harness-report.sh` 의 `find ... -type f` 결과가 fork timing에 의존하는지 확인)
 - [ ] 보류된 Proposal B (commit-time eval 강제) 실전 친화도 추가 검토 후 재투입 여부 판단 — `[no-eval]` 이스케이프가 남발될지 dry-run으로 확인 필요
 - [ ] 보류된 Proposal C (retry-counter) 현 형태로는 false-positive 우려, 재설계 시에만 재투입
 - [ ] (이전부터) `../claude-code-harness-template/`의 기존 미커밋 변경 정리 → `build-template.sh` 실행
