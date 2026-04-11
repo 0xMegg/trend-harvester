@@ -1,4 +1,4 @@
-# Trend Harvester
+# Harness Forge
 
 Claude Code 하네스를 자동으로 개선하는 self-improvement 파이프라인.
 
@@ -25,7 +25,7 @@ Phase 5  Report      ─  실행 보고서 생성
 ## Quick Start
 
 ```bash
-cd trend-harvester
+cd harness-forge
 claude
 
 # 현황 확인
@@ -64,7 +64,7 @@ claude
 ## Project Structure
 
 ```
-trend-harvester/
+harness-forge/
 ├── CLAUDE.md                    # 프로젝트 계약서
 ├── .claude/
 │   ├── commands/harvest.md      # /harvest 커맨드
@@ -124,7 +124,7 @@ trend-harvester/
 ## Relationship with Harness Template
 
 ```
-trend-harvester/          claude-code-harness-template/
+harness-forge/            claude-code-harness-template/
 (이 레포)                  (결과물 레포)
     │                          │
     │  src/ 편집               │  순수 하네스 템플릿

@@ -1,7 +1,7 @@
 # Project Contract
 
 ## Project
-- Name: Trend Harvester
+- Name: Harness Forge
 - Type: Harness Self-Improvement System
 - Stack: Bash, Markdown, Claude Code Skills
 

@@ -1,4 +1,4 @@
-Run the trend-harvester self-improvement pipeline.
+Run the harvest self-improvement pipeline.
 
 ## Task
 $ARGUMENTS

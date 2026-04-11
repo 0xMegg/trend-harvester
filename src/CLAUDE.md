@@ -81,7 +81,7 @@ This workspace coordinates multiple independent repositories:
 - `{{SCHEMA_FILE}}` — data schema (source of truth), if applicable
 
 ## Self-Improvement (Optional — activate by setting harvest/config.json enabled: true)
-- `harvest/config.json` — trend-harvester pipeline configuration
+- `harvest/config.json` — harvest pipeline configuration
 - `context/harvest-policy.md` — auto-apply vs manual approval policy
 - `/harvest` — run full pipeline
 - `/harvest scan` — collection only

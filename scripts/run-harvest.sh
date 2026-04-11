@@ -1,5 +1,5 @@
 #!/bin/bash
-# run-harvest.sh — Trend-harvester 6-Phase pipeline orchestrator
+# run-harvest.sh — harness-forge harvest pipeline (6-Phase) orchestrator
 #
 # Usage:
 #   ./scripts/run-harvest.sh                              # Full pipeline (Phase 0-5)

@@ -1,4 +1,4 @@
-Run the trend-harvester self-improvement pipeline.
+Run the harness-forge self-improvement pipeline.
 
 ## Task
 $ARGUMENTS

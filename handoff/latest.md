@@ -2,7 +2,7 @@
 
 ## What Changed (2026-04-11 PM-2)
 - **harness-report.sh evaluations fallback 결함 수정** (this repo `c804a71`, target sync `8e94671`).
-  - 기존 코드는 `TARGET_DIR/outputs/evaluations`가 없으면 `PROJECT_DIR/outputs/evaluations`로 fallback. src/ 측정 시 trend-harvester 자체의 `outputs/evaluations/20260410-harvest-e2e.md` 1건이 끼어들어 +2점 인플레이션 발생.
+  - 기존 코드는 `TARGET_DIR/outputs/evaluations`가 없으면 `PROJECT_DIR/outputs/evaluations`로 fallback. src/ 측정 시 harness-forge 자체의 `outputs/evaluations/20260410-harvest-e2e.md` 1건이 끼어들어 +2점 인플레이션 발생.
   - 수정: fallback 루프 삭제, TARGET_DIR만 측정. `scripts/harness-report.sh` + `src/scripts/harness-report.sh` 동시 동기화. shellcheck 통과.
 - **양쪽 측정 결과 일치 확인**: `bash scripts/harness-report.sh quick --target src/` 와 `--target ../claude-code-harness-template/` 모두 **53/100** (둘 다 evaluations 0/10).
 - **Run 20260411-040351 기록 정정** (같은 커밋에 묶음):
@@ -97,7 +97,7 @@
 # Handoff — 2026-04-10 (Harvest Batch: 영상 분석 + user 3)
 
 ## What Changed
-- 영상 분석 RTF + 사용자 추가 3건을 기반으로 5개 항목을 trend-harvester 파이프라인에 순차 투입.
+- 영상 분석 RTF + 사용자 추가 3건을 기반으로 5개 항목을 harvest 파이프라인에 순차 투입.
 - SDK 최적화 항목은 user 결정으로 **이번 배치에서 제외** → 5항목으로 축소.
 - 파이프라인 규칙대로 각 항목마다 1차 판단(5축 채점) → 2차 사용자 승인을 거침.
 - Item 1(MCP 예시)은 사용자 거절, 나머지 4개는 적용.
