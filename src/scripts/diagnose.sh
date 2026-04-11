@@ -4,7 +4,7 @@
 #
 # Matches the 5 scenarios in docs/troubleshooting.md.
 
-set -u
+set -euo pipefail
 
 issues=0
 note() { printf '[diagnose] %s\n' "$1" >&2; }

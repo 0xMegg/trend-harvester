@@ -18,7 +18,7 @@
 # Exit 1 = violations (details printed to stderr).
 # Bypass: HARVEST_ALLOW_MCP_UNSAFE=1
 
-set -u
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ -f "$SCRIPT_DIR/../.mcp.json" ] || [ -f "$SCRIPT_DIR/../.mcp.json.example" ]; then
