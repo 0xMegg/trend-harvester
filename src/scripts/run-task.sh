@@ -126,22 +126,35 @@ setup_task_branch() {
 }
 
 finalize_task_branch() {
-  # Called only on APPROVE. Merges task branch back to original and cleans up.
+  # Called only on APPROVE. Pushes the task branch to origin and returns to
+  # the original branch — does NOT merge to main or dev. The reviewer or user
+  # is expected to merge the pushed task branch into `dev` manually after a
+  # final visual review (and later promote `dev` → `main` as a release).
+  #
+  # Rationale: the auto-merge flow encouraged shipping unreviewed changes
+  # straight to main. Push-only preserves the task branch as a review unit
+  # while still landing the work on origin so it survives session resets.
   [ -z "$TASK_BRANCH" ] && return 0
   [ "$DRY_RUN" = true ] && return 0
 
-  git checkout "$ORIGINAL_BRANCH" >/dev/null 2>&1 || {
-    echo "WARN: cannot return to $ORIGINAL_BRANCH — task branch $TASK_BRANCH preserved for inspection" >&2
-    return 0
-  }
-  if git merge --ff-only "$TASK_BRANCH" >/dev/null 2>&1; then
-    echo "[branch] merged ${TASK_BRANCH} → ${ORIGINAL_BRANCH} (ff-only)"
-    git push 2>/dev/null && echo "[branch] pushed ${ORIGINAL_BRANCH}" || echo "[branch] push skipped or failed — local merge kept"
-    git branch -d "$TASK_BRANCH" >/dev/null 2>&1 || true
+  # Push the task branch to origin (preserve, do not merge)
+  if git push -u origin "$TASK_BRANCH" >/dev/null 2>&1; then
+    echo "[branch] pushed ${TASK_BRANCH} → origin (preserved for review)"
   else
-    echo "WARN: ff-only merge failed — leave ${TASK_BRANCH} for manual review" >&2
-    git checkout "$TASK_BRANCH" >/dev/null 2>&1 || true
+    echo "WARN: failed to push ${TASK_BRANCH} to origin — push manually with:" >&2
+    echo "  git push -u origin ${TASK_BRANCH}" >&2
   fi
+
+  # Return to the original branch (typically main) but keep task branch alive
+  if git checkout "$ORIGINAL_BRANCH" >/dev/null 2>&1; then
+    echo "[branch] returned to ${ORIGINAL_BRANCH} (task branch ${TASK_BRANCH} preserved locally + on origin)"
+  else
+    echo "WARN: cannot return to $ORIGINAL_BRANCH — staying on $TASK_BRANCH" >&2
+  fi
+
+  echo "[branch] next step: review the task branch, then merge into dev manually:"
+  echo "  git checkout dev && git merge --no-ff ${TASK_BRANCH} && git push"
+  echo "  (or open a PR with: gh pr create --base dev --head ${TASK_BRANCH})"
 }
 
 # Create an evaluation stub for the just-finished task. Only fires when the
@@ -154,11 +167,15 @@ write_evaluation_stub() {
   [ "$DRY_RUN" = true ] && return 0
   [ -z "${TASK_NUM:-}" ] && return 0
 
-  # Determine the diff range: prefer the task branch's commits, fall back to
-  # the most recent commit on the original branch.
+  # Determine the diff range. New push-only workflow: the task branch is
+  # preserved (not merged into ORIGINAL_BRANCH), so the range is simply
+  # ORIGINAL_BRANCH..TASK_BRANCH. Fall back to HEAD~1..HEAD if either ref is
+  # missing (degenerate / repaired state).
   local diff_range
-  if [ -n "${TASK_BRANCH:-}" ] && git rev-parse --verify "${ORIGINAL_BRANCH}" >/dev/null 2>&1; then
-    diff_range="${ORIGINAL_BRANCH}@{1}..${ORIGINAL_BRANCH}"
+  if [ -n "${TASK_BRANCH:-}" ] \
+     && git rev-parse --verify "${TASK_BRANCH}" >/dev/null 2>&1 \
+     && git rev-parse --verify "${ORIGINAL_BRANCH}" >/dev/null 2>&1; then
+    diff_range="${ORIGINAL_BRANCH}..${TASK_BRANCH}"
   else
     diff_range="HEAD~1..HEAD"
   fi
