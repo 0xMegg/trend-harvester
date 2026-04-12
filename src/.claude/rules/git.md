@@ -4,6 +4,8 @@
 - Message format: `type: Task N — short summary` (feat, fix, refactor, test, docs, chore)
   - Example: `fix: Task 3 — add error handling`
   - Example: `refactor: Task 5 — extract inline logic`
+- Stage integration commit (epic parallel): `type: Stage N — summary`
+  - Example: `feat: Stage 2 — implement API endpoints and tests`
 - One commit per Task (logical unit)
 - Never commit secrets, .env files, or build outputs
 - Lint/analyze must pass before committing

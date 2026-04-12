@@ -578,8 +578,43 @@ while [ "$ITER" -le "$MAX_ITER" ]; do
     exit 1
   fi
 
-  # Check verdict
-  if grep -qi "REQUEST_CHANGES\|request.changes" "$REVIEW_LOG" 2>/dev/null; then
+  # Check verdict — search only the tail of the review log to avoid
+  # false positives from earlier context (e.g. "fixed previous REQUEST_CHANGES").
+  # Structured markers (<!-- FINAL_VERDICT: X -->) are checked first.
+  VERDICT_TAIL=$(tail -40 "$REVIEW_LOG" 2>/dev/null || true)
+
+  if echo "$VERDICT_TAIL" | grep -q '<!-- FINAL_VERDICT: APPROVE -->'; then
+    log_success "Review verdict: APPROVE (iter ${ITER}) [marker]"
+    VERDICT="APPROVE"
+    break
+  elif echo "$VERDICT_TAIL" | grep -q '<!-- FINAL_VERDICT: REQUEST_CHANGES -->'; then
+    log_fail "Review verdict: REQUEST_CHANGES (iter ${ITER}) [marker]"
+    write_status "ROLE=done" "VERDICT=REQUEST_CHANGES"
+    echo ""
+    echo "Review output: $REVIEW_LOG"
+    echo ""
+    echo "Next steps:"
+    echo "  1. Read the review: cat $REVIEW_LOG"
+    echo "  2. Fix: /develop $TASK — REQUEST_CHANGES fix"
+    echo "  3. Re-review: /review $TASK"
+    exit 1
+  elif echo "$VERDICT_TAIL" | grep -q '<!-- FINAL_VERDICT: ITERATE -->'; then
+    if [ "$ITER" -lt "$MAX_ITER" ]; then
+      log_warn "Review verdict: ITERATE (iter ${ITER}/${MAX_ITER}) [marker] — refining..."
+      write_status "VERDICT=ITERATE"
+      ITER=$((ITER + 1))
+      continue
+    else
+      log_warn "Review verdict: ITERATE but max iterations reached (${MAX_ITER})"
+      log_warn "Accepting current state. Manual refinement may be needed."
+      VERDICT="ITERATE_EXHAUSTED"
+      break
+    fi
+  elif echo "$VERDICT_TAIL" | grep -qi "APPROVE"; then
+    log_success "Review verdict: APPROVE (iter ${ITER})"
+    VERDICT="APPROVE"
+    break
+  elif echo "$VERDICT_TAIL" | grep -qi "REQUEST_CHANGES\|request.changes"; then
     log_fail "Review verdict: REQUEST_CHANGES (iter ${ITER})"
     write_status "ROLE=done" "VERDICT=REQUEST_CHANGES"
     echo ""
@@ -590,9 +625,7 @@ while [ "$ITER" -le "$MAX_ITER" ]; do
     echo "  2. Fix: /develop $TASK — REQUEST_CHANGES fix"
     echo "  3. Re-review: /review $TASK"
     exit 1
-  fi
-
-  if grep -qi "ITERATE" "$REVIEW_LOG" 2>/dev/null; then
+  elif echo "$VERDICT_TAIL" | grep -qi "ITERATE"; then
     if [ "$ITER" -lt "$MAX_ITER" ]; then
       log_warn "Review verdict: ITERATE (iter ${ITER}/${MAX_ITER}) — refining..."
       write_status "VERDICT=ITERATE"
@@ -604,18 +637,12 @@ while [ "$ITER" -le "$MAX_ITER" ]; do
       VERDICT="ITERATE_EXHAUSTED"
       break
     fi
-  fi
-
-  if grep -qi "APPROVE" "$REVIEW_LOG" 2>/dev/null; then
-    log_success "Review verdict: APPROVE (iter ${ITER})"
-    VERDICT="APPROVE"
+  else
+    # No recognized verdict — treat as done
+    log_warn "No clear verdict detected in review log"
+    VERDICT="UNKNOWN"
     break
   fi
-
-  # No recognized verdict — treat as done
-  log_warn "No clear verdict detected in review log"
-  VERDICT="UNKNOWN"
-  break
 done
 
 write_status "ROLE=done" "VERDICT=${VERDICT}"

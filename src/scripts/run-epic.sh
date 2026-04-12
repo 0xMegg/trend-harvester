@@ -17,6 +17,12 @@
 
 set -euo pipefail
 
+# Bash 3.2+ required (macOS default). Reject older versions early.
+if (( BASH_VERSINFO[0] < 3 )) || { (( BASH_VERSINFO[0] == 3 )) && (( BASH_VERSINFO[1] < 2 )); }; then
+  echo "ERROR: run-epic.sh requires bash 3.2+. Current: $BASH_VERSION" >&2
+  exit 1
+fi
+
 # ============================================================
 # Configuration
 # ============================================================
@@ -30,10 +36,15 @@ MAX_PARALLEL="${MAX_PARALLEL:-3}"
 # Argument parsing (flags first, then epic description)
 # ============================================================
 DRY_RUN=false
+FORCE_RERUN=false
 while [ $# -gt 0 ]; do
   case "${1:-}" in
     --dry-run)
       DRY_RUN=true
+      shift
+      ;;
+    --force)
+      FORCE_RERUN=true
       shift
       ;;
     --)
@@ -307,7 +318,7 @@ while IFS= read -r line; do
   fi
 
   # Detect Slice/Task lines (existing pattern)
-  if echo "$line" | grep -qiE "^[[:space:]]*[-*|#0-9].*\b(Task|Slice)\s+[0-9]"; then
+  if echo "$line" | grep -qE "^#{3,4}[[:space:]]+(Task|Slice)[[:space:]]+[0-9]"; then
     SLICE_DESC=$(echo "$line" | sed -E '
       s/^[[:space:]]*[-*|]+[[:space:]]*//;
       s/\|[[:space:]]*$//;
@@ -340,7 +351,7 @@ done < "$EPIC_PLAN"
 if [ ${#SLICES[@]} -eq 0 ]; then
   echo -e "${YELLOW}! Could not auto-parse Slices from epic plan${NC}"
   echo "Run slices manually: ./scripts/run-task.sh \"Task N — description\""
-  exit 0
+  exit 1
 fi
 
 TOTAL=${#SLICES[@]}
@@ -485,8 +496,8 @@ finalize_slice_worktree() {
   # Remove worktree and delete its branch
   local wt_branch
   wt_branch=$( ( cd "$wt_dir" && git symbolic-ref --short HEAD 2>/dev/null ) || true)
-  git worktree remove --force "$wt_dir" >/dev/null 2>&1 || true
-  [ -n "$wt_branch" ] && git branch -D "$wt_branch" >/dev/null 2>&1 || true
+  git worktree remove --force "$wt_dir" >/dev/null 2>&1 || echo "WARNING: failed to remove worktree $wt_dir" >&2
+  [ -n "$wt_branch" ] && { git branch -D "$wt_branch" >/dev/null 2>&1 || echo "WARNING: failed to delete branch $wt_branch" >&2; }
 
   # Tidy up empty parent directories left behind by setup_slice_worktree.
   # rmdir only succeeds when the directory is empty, so this is safe even if
@@ -604,7 +615,7 @@ run_parallel_stage() {
   fi
 
   # Per-slice worktree bookkeeping (only populated when WORKTREE_ENABLED=1)
-  declare -A SLICE_WT_DIR=()
+  SLICE_WT_DIR=()
 
   # Prepare per-task handoff files
   for idx in "${indices[@]}"; do
@@ -637,6 +648,19 @@ run_parallel_stage() {
       local task_log_dir="${LOG_DIR}/task-slice-${idx}"
       mkdir -p "$task_log_dir"
 
+      # H2: Skip already-approved slices unless --force
+      if [ "$FORCE_RERUN" = false ]; then
+        local par_status="${task_log_dir}/task-status"
+        if [ -f "$par_status" ]; then
+          local pv=""
+          pv=$(grep "^VERDICT=" "$par_status" 2>/dev/null | tail -1 | cut -d= -f2 | tr -d "'" || true)
+          if [ "$pv" = "APPROVE" ]; then
+            echo -e "  ${GREEN}Skip: Slice $((idx+1)) already APPROVE'd${NC}"
+            continue
+          fi
+        fi
+      fi
+
       echo -e "  ${BLUE}Starting: Slice $((idx+1)) — ${slice_desc}${NC}"
 
       local dry_flag=""
@@ -668,6 +692,22 @@ run_parallel_stage() {
     done
 
     echo -e "  Logs: ${LOG_DIR}/task-slice-{...}/"
+
+    # H1: Health check — verify batch processes started (5s grace period)
+    if [ ${#pids[@]} -gt 0 ]; then
+      sleep 5
+      for hc_idx in "${!pids[@]}"; do
+        local hc_pid="${pids[$hc_idx]}"
+        local hc_s_idx="${pid_to_idx[$hc_idx]}"
+        local hc_log="${LOG_DIR}/task-slice-${hc_s_idx}/stdout.log"
+        if ! kill -0 "$hc_pid" 2>/dev/null; then
+          echo -e "  ${RED}WARNING: Slice $((hc_s_idx+1)) process died within 5s (PID $hc_pid)${NC}" >&2
+        elif [ ! -f "$hc_log" ] || [ ! -s "$hc_log" ]; then
+          echo -e "  ${YELLOW}WARNING: Slice $((hc_s_idx+1)) log empty after 5s — may be stuck${NC}" >&2
+        fi
+      done
+    fi
+
     echo "  Waiting for batch to complete..."
 
     # Wait for all PIDs in this batch (|| true prevents set -e from killing us)
@@ -777,6 +817,20 @@ for stage_num in $(seq 1 "$STAGE_COUNT"); do
     local_idx="${stage_indices[0]}"
     SLICE="${SLICES[$local_idx]}"
 
+    # H2: Skip already-approved slices unless --force
+    if [ "$FORCE_RERUN" = false ]; then
+      seq_status="${LOG_DIR}/task-slice-${local_idx}/task-status"
+      if [ -f "$seq_status" ]; then
+        prev_verdict=$(grep "^VERDICT=" "$seq_status" 2>/dev/null | tail -1 | cut -d= -f2 | tr -d "'" || true)
+        if [ "$prev_verdict" = "APPROVE" ]; then
+          echo -e "  ${GREEN}Skip: Slice $((local_idx+1)) already APPROVE'd${NC}"
+          COMPLETED_STAGES=$((COMPLETED_STAGES+1))
+          write_epic_status "COMPLETED_STAGES=${COMPLETED_STAGES}"
+          continue
+        fi
+      fi
+    fi
+
     echo -e "${BLUE}Running: Slice $((local_idx+1)) — ${SLICE}${NC}"
 
     dry_flag=""
@@ -801,6 +855,8 @@ for stage_num in $(seq 1 "$STAGE_COUNT"); do
         exit 1
       fi
       run_deploy_hook "$stage_num"
+      # M6: Sync handoff after sequential stage completion
+      merge_stage_handoffs "$stage_num" "$local_idx"
     else
       echo -e "${RED}✗ Slice $((local_idx+1)) failed: $SLICE${NC}"
       echo ""

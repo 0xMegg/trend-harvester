@@ -3,9 +3,20 @@
 #
 # Usage:
 #   cd /path/to/your-project
-#   /path/to/claude-code-harness-template/setup.sh [project-name]
+#   /path/to/claude-code-harness-template/setup.sh [--preset=nextjs|python|go] [project-name]
 
 set -e
+
+# Parse --preset flag
+PRESET=""
+POSITIONAL=()
+for arg in "$@"; do
+  case "$arg" in
+    --preset=*) PRESET="${arg#--preset=}" ;;
+    *) POSITIONAL+=("$arg") ;;
+  esac
+done
+set -- "${POSITIONAL[@]+"${POSITIONAL[@]}"}"
 
 PROJECT_NAME="${1:-my-project}"
 TEMPLATE_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -45,6 +56,34 @@ mkdir -p "$TARGET_DIR/docs"
 echo "[2/7] Copying core files..."
 cp "$TEMPLATE_DIR/CLAUDE.md" "$TARGET_DIR/CLAUDE.md"
 cp "$TEMPLATE_DIR/.claude/settings.json" "$TARGET_DIR/.claude/settings.json"
+
+# Apply permission preset (adds runtime commands to settings.json allowDenyList)
+if [ -n "$PRESET" ]; then
+  case "$PRESET" in
+    nextjs|node)
+      PRESET_RULES='"Bash(npm *)", "Bash(npx *)", "Bash(node *)"'
+      ;;
+    python)
+      PRESET_RULES='"Bash(pip *)", "Bash(pip3 *)", "Bash(python *)", "Bash(python3 *)"'
+      ;;
+    go)
+      PRESET_RULES='"Bash(go *)"'
+      ;;
+    *)
+      echo "WARNING: Unknown preset '$PRESET'. Supported: nextjs, python, go"
+      PRESET_RULES=""
+      ;;
+  esac
+  if [ -n "$PRESET_RULES" ]; then
+    # Insert preset rules after the last existing allow entry in settings.json
+    # Find the last "Bash(git" line and append after it
+    sed -i '' '/Bash(git log/a\
+      '"$PRESET_RULES"',' "$TARGET_DIR/.claude/settings.json" 2>/dev/null || \
+    sed -i '/Bash(git log/a\
+      '"$PRESET_RULES"',' "$TARGET_DIR/.claude/settings.json" 2>/dev/null || true
+    echo "Applied preset: $PRESET ($PRESET_RULES)"
+  fi
+fi
 
 # Copy hook scripts and set permissions
 echo "[3/7] Setting up hooks..."

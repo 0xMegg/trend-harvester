@@ -77,11 +77,19 @@ If you find an issue, do not self-invalidate it.
 - Only Minor issues → APPROVE
 - Functional but below quality bar (UI polish, performance, etc.) → ITERATE (provide specific improvement targets)
 
+## Verdict Output Format
+At the very end of your review output, emit a structured marker on its own line:
+`<!-- FINAL_VERDICT: APPROVE -->`
+Use exactly one of: `APPROVE`, `REQUEST_CHANGES`, `ITERATE`.
+This marker enables reliable automated parsing by the orchestrator.
+
 ## Commit Rules (APPROVE only)
 - Commit + push immediately after APPROVE — do not ask
 - Message format: `type: Task N — short summary`
   - Example: `fix: Task 3 — add error handling`
   - Example: `refactor: Task 5 — extract inline logic`
+- Stage integration commit (epic parallel): `type: Stage N — summary`
+  - Example: `feat: Stage 2 — implement API endpoints and tests`
 - One commit per Task
 - Include handoff/latest.md + review file in the same commit (in the repo where they reside)
 - Never commit/push on REQUEST_CHANGES

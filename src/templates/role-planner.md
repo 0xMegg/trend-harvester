@@ -45,6 +45,11 @@ When decomposing an Epic into Stages & Slices:
 - Put slices in **separate Stages** — sequential is always safe, parallel is an optimization
 - Prefer 2 sequential Stages over 1 risky parallel Stage
 
+### Slice Definition Format
+- Slice definitions MUST use `###` or `####` headings only: `### Slice 1.1 — Description`
+- Body text references to slices MUST use inline code: `` `Slice 1.4` `` — never bare "Slice N.N" in prose
+- This prevents the parser from treating body references as new slice definitions
+
 ### Multi-Repo Workspaces
 When workspace contains multiple git repos (e.g., `backend/`, `frontend/`):
 - Prefix file paths with repo name: `backend/src/api/auth.ts`, `frontend/src/pages/login.tsx`

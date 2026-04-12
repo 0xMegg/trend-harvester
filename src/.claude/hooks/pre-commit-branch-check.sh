@@ -13,6 +13,8 @@
 
 set -u
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
 input="${1:-}"
 if [ -z "$input" ]; then
   if [ -p /dev/stdin ] || [ ! -t 0 ]; then

@@ -13,7 +13,7 @@ Use `run_in_background: true`.
 2. Immediately after, run the status monitor in the background (single command, one approval):
 
 ```bash
-L=/tmp/{{PROJECT_NAME}}-run/latest; while true; do sleep 45; [ -f "$L/epic-status" ] || { echo "⏱ waiting for epic to start..."; continue; }; ES=$(. "$L/epic-status"; e=$(( $(date +%s) - ${START_EPOCH:-$(date +%s)} )); echo "⏱ $((e/60))m$((e%60))s | ${EPIC_NAME:-?} | Stage ${STAGE:-?}/${STAGE_TOTAL:-?}"); TS=""; for d in "$L"/task-slice-*/; do [ -f "$d/task-status" ] || continue; s=$(basename "$d"); TS="$TS$(. "$d/task-status"; r="${ROLE:-?}"; [ -n "${VERDICT:-}" ] && r="${r}[${VERDICT}]"; echo " | $s:$r")"; done; if [ -f "$L/task-status" ]; then TS="$TS$(. "$L/task-status"; r="${ROLE:-?}"; [ -n "${VERDICT:-}" ] && r="${r}[${VERDICT}]"; idx="${TASK_INDEX:-?}"; echo " | seq-${idx}:$r")"; fi; echo "${ES}${TS}"; done
+L=/tmp/{{PROJECT_NAME}}-run/latest; while true; do sleep 45; [ -f "$L/epic-status" ] || { echo "⏱ waiting for epic to start..."; continue; }; ES=$(. "$L/epic-status"; e=$(( $(date +%s) - ${START_EPOCH:-$(date +%s)} )); echo "⏱ $((e/60))m$((e%60))s | ${EPIC_NAME:-?} | Stage ${STAGE:-?}/${STAGE_TOTAL:-?}"); TS=""; for d in "$L"/task-slice-*/ 2>/dev/null; do [ -d "$d" ] || continue; [ -f "$d/task-status" ] || continue; s=$(basename "$d"); TS="$TS$(. "$d/task-status"; r="${ROLE:-?}"; [ -n "${VERDICT:-}" ] && r="${r}[${VERDICT}]"; echo " | $s:$r")"; done; if [ -f "$L/task-status" ]; then TS="$TS$(. "$L/task-status"; r="${ROLE:-?}"; [ -n "${VERDICT:-}" ] && r="${r}[${VERDICT}]"; idx="${TASK_INDEX:-?}"; echo " | seq-${idx}:$r")"; fi; echo "${ES}${TS}"; done
 ```
 Use `run_in_background: true`.
 
