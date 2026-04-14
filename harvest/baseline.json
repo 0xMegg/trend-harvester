@@ -1,13 +1,13 @@
 {
-  "score": 53,
+  "score": 57,
   "max": 100,
   "mode": "quick",
-  "timestamp": "2026-04-11T05:49:20Z",
+  "timestamp": "2026-04-14T06:29:00Z",
   "breakdown": {
     "rules": {
-      "score": 5,
+      "score": 9,
       "max": 20,
-      "detail": "5 files, 106 lines"
+      "detail": "5 files, 114 lines"
     },
     "skills": {
       "score": 12,
@@ -22,12 +22,12 @@
     "guidance": {
       "score": 7,
       "max": 10,
-      "detail": "16 files, 923 lines"
+      "detail": "16 files, 932 lines"
     },
     "scripts": {
       "score": 10,
       "max": 10,
-      "detail": "6 scripts, 6 HARD, 4 pipefail"
+      "detail": "8 scripts, 8 HARD, 8 pipefail"
     },
     "templates": {
       "score": 8,

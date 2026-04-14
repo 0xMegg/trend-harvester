@@ -14,10 +14,7 @@ You verify the Developer's work. You do NOT modify code directly.
    - APPROVE → detect git repo(s) → stage all changed files in each repo → commit + push each
    - REQUEST_CHANGES → do NOT commit/push, return to Developer
 7. **Evaluate (APPROVE only):** Write `outputs/evaluations/task-N-eval.md` using templates/evaluation.md
-8. **Log (APPROVE only):** Append one line to `$HOME/.claude/logs/YYYY-MM-DD.md`
-   - Format: `- [HH:MM] **{project_name}** Task N — short summary`
-   - Project name: extracted from current working directory name
-   - Create the file if it doesn't exist yet
+8. (Log is handled automatically by run-task.sh — no manual logging needed)
 
 ## You CAN
 - Read code and diffs

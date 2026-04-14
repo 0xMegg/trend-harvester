@@ -160,7 +160,7 @@ if [ -d "$rules_dir" ]; then
     n=$(count_effective_lines "$f")
     rules_lines=$((rules_lines + n))
   done
-  depth_points=$(tier "$rules_lines" 200 3 400 5 600 7 800 9 1200 10)
+  depth_points=$(tier "$rules_lines" 50 2 100 4 200 6 400 8 800 10)
 
   rules_score=$((file_points + depth_points))
   rules_score=$((rules_score > 20 ? 20 : rules_score))

@@ -46,6 +46,16 @@ rsync -av --delete \
   --exclude='.DS_Store' \
   "$SRC_DIR/" "$OUT_DIR/"
 
+# Write harness version stamp for staleness detection by run-epic/run-task
+FORGE_HASH=$(git -C "$PROJECT_DIR" rev-parse --short HEAD 2>/dev/null || echo "unknown")
+FORGE_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+cat > "$OUT_DIR/.claude/.harness-version" << VEOF
+HARNESS_VERSION=4.0.0
+FORGE_COMMIT=$FORGE_HASH
+BUILD_TIMESTAMP=$FORGE_TIMESTAMP
+VEOF
+echo "  Version stamp: .claude/.harness-version (forge $FORGE_HASH)"
+
 # Ensure scripts are executable
 find "$OUT_DIR/scripts" -name '*.sh' -exec chmod +x {} \; 2>/dev/null || true
 [ -f "$OUT_DIR/setup.sh" ] && chmod +x "$OUT_DIR/setup.sh"

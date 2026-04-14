@@ -19,7 +19,4 @@ You MUST review exactly the task specified above. Do NOT substitute, reorder, or
 6. Commit (LAST step — after all files are written):
    - APPROVE → stage all changed files (code + review + handoff) → commit + push
    - REQUEST_CHANGES → do NOT commit, return to Developer
-7. Log (APPROVE only): append one line to $HOME/.claude/logs/YYYY-MM-DD.md
-   - Format: `- [HH:MM] **{project}** Task N — short summary`
-   - Project name: extract from current working directory name
-   - Create the file if it doesn't exist yet
+7. (Log is handled automatically by run-task.sh — no manual logging needed)

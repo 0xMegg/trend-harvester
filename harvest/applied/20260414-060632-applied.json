@@ -1,0 +1,26 @@
+[
+  {
+    "id": "internal-eval-scoring",
+    "applied_at": "2026-04-14T06:10:00Z",
+    "change": "scripts/harness-report.sh — rules depth tier adjusted from 200/400/600/800/1200 to 50/100/200/400/800",
+    "baseline_before": 53,
+    "baseline_after": 57,
+    "delta": 4
+  },
+  {
+    "id": "manual-version-check",
+    "applied_at": "2026-04-14T06:15:00Z",
+    "change": "src/scripts/run-epic.sh + run-task.sh — check_harness_version() added; scripts/build-template.sh — .harness-version stamp added",
+    "baseline_before": 57,
+    "baseline_after": 57,
+    "delta": 0
+  },
+  {
+    "id": "manual-epic-progress",
+    "applied_at": "2026-04-14T06:20:00Z",
+    "change": "src/scripts/run-epic.sh — background progress monitor for parallel batch execution, polls task-status every 10s",
+    "baseline_before": 57,
+    "baseline_after": 57,
+    "delta": 0
+  }
+]

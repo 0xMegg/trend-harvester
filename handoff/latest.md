@@ -1,3 +1,49 @@
+# Handoff — 2026-04-12 (Epics Postmortem: 12 issues fixed)
+
+## What Changed (2026-04-12)
+kody-oms 4-epic 실행 포스트모템(`/workouts/kody-oms/outputs/epics-postmortem.md`) 기반으로 하네스 인프라 이슈 12건 일괄 수정. 8개 파일 변경, 161 insertions.
+
+### Critical (4건 — 실행 성패 좌우)
+- **C1**: `run-epic.sh` `declare -A SLICE_WT_DIR` → 일반 배열 (bash 3.2 호환) + 버전 체크 추가
+- **C2**: `run-task.sh` verdict 파싱 — `tail -40` 범위 제한 + `<!-- FINAL_VERDICT: X -->` 구조화 마커 우선 + APPROVE 먼저 체크 (REQUEST_CHANGES 오탐 차단)
+- **C3**: `run-epic.sh` slice 파서 regex — heading-only 매칭 (`^#{3,4}`) + 파싱 실패 시 `exit 1`
+- **C4**: `setup.sh` `--preset=nextjs|python|go` 플래그 — headless 실행 시 permission 벽 해결
+
+### High (2건 — 안정성)
+- **H1**: `run-epic.sh` 병렬 slice health check — 배치 시작 5초 후 PID 생존 + 로그 파일 검증
+- **H2**: `run-epic.sh` slice 체크포인트/스킵 — APPROVE된 slice 재실행 방지, `--force` 강제 재실행
+
+### Medium (6건 — 품질/편의성)
+- **M1**: `role-planner.md` slice heading 규칙 (C3 regex와 계약)
+- **M2**: `epic.md` monitor zsh glob 가드 (`2>/dev/null` + `[ -d ]`)
+- **M3**: `pre-commit-branch-check.sh` `SCRIPT_DIR` 절대경로 resolve
+- **M4**: `run-epic.sh` worktree 정리 실패 시 WARNING 출력 (`|| true` → `|| echo WARNING`)
+- **M5**: `role-reviewer.md` + `git.md` Stage 커밋 포맷 통일 (`type: Stage N — summary`)
+- **M6**: `run-epic.sh` 순차 경로 handoff 동기화 (`merge_stage_handoffs` 호출 추가)
+
+### 검증 결과
+- `bash -n` 4개 스크립트 전부 통과
+- shellcheck 에러 없음
+- bash 4+ 구문 잔존 없음
+- C2 verdict 시나리오 3/3 통과
+- C3 regex 시나리오 9/9 통과
+- `build-template.sh` → target repo 동기화 완료
+
+### Current State (2026-04-12)
+- Baseline: 측정 필요 (harness-report 실행 전)
+- Commit: `9ac8c79` (main, pushed)
+- target repo: `build-template.sh` 실행 완료, 78 files synced
+- 두 repo 모두 origin/main과 동기화
+
+## What's Next (2026-04-12)
+- [ ] harness-report 실행하여 baseline 갱신
+- [ ] target repo에서 template 업데이트 커밋
+- [ ] (선택) 옛 memory 백업 디렉토리 정리
+- [ ] (운영) `write_evaluation_stub` dogfood
+- [ ] (이전부터) harness-report 가중치 재설계
+
+---
+
 # Handoff — 2026-04-11 PM-4 (Self-improvement batch: 5 carry-overs closed)
 
 ## What Changed (2026-04-11 PM-4)

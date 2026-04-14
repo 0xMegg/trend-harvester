@@ -80,6 +80,36 @@ fi
 mkdir -p "$LOG_DIR"
 
 # ============================================================
+# Harness version staleness check
+# Warns if .claude/.harness-version is missing or older than 7 days.
+# Skipped when launched by run-epic.sh (EPIC_NAME is set) to avoid duplicate warnings.
+# ============================================================
+check_harness_version() {
+  if [ -n "${EPIC_NAME:-}" ]; then return 0; fi  # epic already checked
+  local vfile="$PROJECT_DIR/.claude/.harness-version"
+  if [ ! -f "$vfile" ]; then
+    echo -e "${YELLOW}⚠ .claude/.harness-version not found — run build-template.sh from harness-forge to stamp the version${NC}" >&2
+    return 0
+  fi
+  # shellcheck disable=SC1090
+  source "$vfile"
+  echo -e "${CYAN}  Harness: v${HARNESS_VERSION:-?} (forge ${FORGE_COMMIT:-?}, built ${BUILD_TIMESTAMP:-?})${NC}" >&2
+
+  if [ -n "${BUILD_TIMESTAMP:-}" ]; then
+    local build_epoch now_epoch age_days
+    build_epoch=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "$BUILD_TIMESTAMP" +%s 2>/dev/null || date -d "$BUILD_TIMESTAMP" +%s 2>/dev/null || echo 0)
+    now_epoch=$(date +%s)
+    if [ "$build_epoch" -gt 0 ]; then
+      age_days=$(( (now_epoch - build_epoch) / 86400 ))
+      if [ "$age_days" -ge 7 ]; then
+        echo -e "${YELLOW}⚠ Harness template is ${age_days} days old — consider running build-template.sh to pick up forge improvements${NC}" >&2
+      fi
+    fi
+  fi
+}
+check_harness_version
+
+# ============================================================
 # Branch isolation — create task/{id} branch if on main/master
 # (skipped when parent epic already set up branch via TASK_ID,
 #  or during dry-run, or in non-git dirs, or when HARVEST_ALLOW_MAIN=1)
@@ -234,6 +264,55 @@ write_evaluation_stub() {
     } > "$eval_file"
   fi
   echo "[eval] stub written: $eval_file"
+}
+
+log_task_entry() {
+  # Append a structured log line to ~/Dev/13.claude/logs/YYYY-MM-DD.md
+  # Called on EVERY task completion — success or failure.
+  [ "$DRY_RUN" = true ] && return 0
+
+  local log_home="${TASK_LOG_HOME:-$HOME/Dev/13.claude/logs}"
+  mkdir -p "$log_home"
+
+  local now_hhmm
+  now_hhmm=$(date +%H:%M)
+  local now_hour
+  now_hour=$(date +%H | sed 's/^0//')
+
+  # 오전 9시 경계 규칙: 00:00~08:59 → 전날 파일에 기록
+  local log_date
+  if [ "$now_hour" -lt 9 ]; then
+    log_date=$(date -v-1d +%Y-%m-%d 2>/dev/null || date -d "yesterday" +%Y-%m-%d)
+  else
+    log_date=$(date +%Y-%m-%d)
+  fi
+
+  local log_file="${log_home}/${log_date}.md"
+  local proj="${PROJECT_NAME}"
+  local verdict="${VERDICT:-UNKNOWN}"
+  local task_desc="${TASK:-untitled}"
+
+  # 소요 시간 계산 (from STATUS_FILE's START_EPOCH)
+  local elapsed_str="0:00"
+  if [ -f "$STATUS_FILE" ]; then
+    local _start_epoch
+    _start_epoch=$(grep '^START_EPOCH=' "$STATUS_FILE" | tail -1 | sed "s/^START_EPOCH=//; s/^'//; s/'$//")
+    if [ -n "$_start_epoch" ]; then
+      local _now_epoch
+      _now_epoch=$(date +%s)
+      local _el=$(( _now_epoch - _start_epoch ))
+      local _mm=$(( _el / 60 ))
+      local _ss=$(( _el % 60 ))
+      elapsed_str=$(printf '%d:%02d' "$_mm" "$_ss")
+    fi
+  fi
+
+  # 로그 라인 작성
+  printf -- '- [%s] **%s** %s — %s (%s)\n' \
+    "$now_hhmm" "$proj" "$task_desc" "$verdict" "$elapsed_str" \
+    >> "$log_file"
+
+  echo "[log] entry appended: $log_file"
 }
 
 # Colors
@@ -532,6 +611,7 @@ log_phase "PHASE 1/3: PLAN"
 if ! run_claude "plan" "/plan $TASK"; then
   log_fail "Plan phase failed. Check ${LOG_DIR}/plan.log"
   write_status "ROLE=failed" "VERDICT=PLAN_FAILED"
+  log_task_entry
   exit 1
 fi
 
@@ -559,6 +639,7 @@ while [ "$ITER" -le "$MAX_ITER" ]; do
   if ! run_claude "develop-iter${ITER}" "$DEVELOP_PROMPT"; then
     log_fail "Develop phase failed (iter ${ITER}). Check ${DEVELOP_LOG}"
     write_status "ROLE=failed" "VERDICT=DEVELOP_FAILED"
+    log_task_entry
     exit 1
   fi
   log_success "Develop phase complete (iter ${ITER})"
@@ -575,6 +656,7 @@ while [ "$ITER" -le "$MAX_ITER" ]; do
   if ! run_claude "review-iter${ITER}" "/review $TASK"; then
     log_fail "Review phase failed (iter ${ITER}). Check ${REVIEW_LOG}"
     write_status "ROLE=failed" "VERDICT=REVIEW_FAILED"
+    log_task_entry
     exit 1
   fi
 
@@ -590,6 +672,7 @@ while [ "$ITER" -le "$MAX_ITER" ]; do
   elif echo "$VERDICT_TAIL" | grep -q '<!-- FINAL_VERDICT: REQUEST_CHANGES -->'; then
     log_fail "Review verdict: REQUEST_CHANGES (iter ${ITER}) [marker]"
     write_status "ROLE=done" "VERDICT=REQUEST_CHANGES"
+    log_task_entry
     echo ""
     echo "Review output: $REVIEW_LOG"
     echo ""
@@ -617,6 +700,7 @@ while [ "$ITER" -le "$MAX_ITER" ]; do
   elif echo "$VERDICT_TAIL" | grep -qi "REQUEST_CHANGES\|request.changes"; then
     log_fail "Review verdict: REQUEST_CHANGES (iter ${ITER})"
     write_status "ROLE=done" "VERDICT=REQUEST_CHANGES"
+    log_task_entry
     echo ""
     echo "Review output: $REVIEW_LOG"
     echo ""
@@ -646,6 +730,7 @@ while [ "$ITER" -le "$MAX_ITER" ]; do
 done
 
 write_status "ROLE=done" "VERDICT=${VERDICT}"
+log_task_entry
 
 # ============================================================
 # Finalize task branch on APPROVE (auto-merge back to original)
