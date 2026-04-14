@@ -166,30 +166,50 @@ check_harness_version
 # If PROJECT_DIR is a git repo, returns PROJECT_DIR only.
 # Otherwise, finds immediate child directories that are git repos.
 discover_git_repos() {
+  local root_is_git=false
   if [ -d "$PROJECT_DIR/.git" ] || git -C "$PROJECT_DIR" rev-parse --git-dir >/dev/null 2>&1; then
-    echo "$PROJECT_DIR"
-    return
+    root_is_git=true
   fi
 
-  local repos=()
+  # Always scan children for independent .git/ repos (hybrid mode support)
+  local sub_repos=()
   for dir in "$PROJECT_DIR"/*/; do
+    [ -d "$dir" ] || continue
     if [ -d "${dir}.git" ]; then
-      repos+=("${dir%/}")
+      if $root_is_git; then
+        # Distinguish submodule from independent sub-repo
+        local relpath
+        relpath="${dir#"$PROJECT_DIR"/}"
+        relpath="${relpath%/}"
+        if git -C "$PROJECT_DIR" ls-files --error-unmatch "$relpath" >/dev/null 2>&1; then
+          continue   # submodule — skip
+        fi
+      fi
+      sub_repos+=("${dir%/}")
     fi
   done
 
-  if [ ${#repos[@]} -eq 0 ]; then
+  if $root_is_git; then
+    echo "$PROJECT_DIR"
+  fi
+  if [ ${#sub_repos[@]} -gt 0 ]; then
+    printf '%s\n' "${sub_repos[@]}"
+  fi
+
+  if ! $root_is_git && [ ${#sub_repos[@]} -eq 0 ]; then
     echo "WARNING: No git repos found under $PROJECT_DIR" >&2
     return 1
   fi
-
-  printf '%s\n' "${repos[@]}"
 }
 
 IS_MULTI_REPO=false
-if ! [ -d "$PROJECT_DIR/.git" ] && ! git -C "$PROJECT_DIR" rev-parse --git-dir >/dev/null 2>&1; then
+_repo_count=$(discover_git_repos 2>/dev/null | wc -l | tr -d ' ')
+if [ "${_repo_count:-0}" -gt 1 ]; then
+  IS_MULTI_REPO=true
+elif ! [ -d "$PROJECT_DIR/.git" ] && ! git -C "$PROJECT_DIR" rev-parse --git-dir >/dev/null 2>&1; then
   IS_MULTI_REPO=true
 fi
+unset _repo_count
 
 # ============================================================
 # Epic branch isolation — create epic/{RUN_ID} branch off main
@@ -199,6 +219,7 @@ fi
 EPIC_BRANCH=""
 EPIC_ORIGINAL_BRANCH=""
 EPIC_ORIGINAL_BRANCHES=()   # multi-repo: "repo_path|original_branch" entries
+EPIC_KNOWN_REPOS=()         # repos known at setup_epic_branch time
 
 setup_epic_branch() {
   if [ "$DRY_RUN" = true ]; then return 0; fi
@@ -296,6 +317,16 @@ finalize_epic_branch() {
         git checkout "epic/${RUN_ID}" >/dev/null 2>&1 || true
       fi
     done
+    # Log repos created mid-epic (no epic branch to merge)
+    while IFS= read -r repo_dir; do
+      local is_known=false
+      for kr in "${EPIC_KNOWN_REPOS[@]}"; do
+        [ "$repo_dir" = "$kr" ] && is_known=true && break
+      done
+      if ! $is_known && [ -d "$repo_dir/.git" ]; then
+        echo "[epic-branch] [$(basename "$repo_dir")] new repo — no epic branch, skipping finalize"
+      fi
+    done < <(discover_git_repos 2>/dev/null)
     cd "$PROJECT_DIR"
   else
     # --- Single-repo: original logic ---
@@ -315,6 +346,11 @@ finalize_epic_branch() {
 }
 
 setup_epic_branch
+
+# Record repos known at setup time (used to detect mid-epic repo creation)
+while IFS= read -r _kr; do
+  EPIC_KNOWN_REPOS+=("$_kr")
+done < <(discover_git_repos 2>/dev/null)
 
 # Colors
 RED='\033[0;31m'
@@ -588,9 +624,11 @@ check_slice_overlap() {
   done
 
   if [ "$has_data" -eq 0 ]; then
-    # No file lists parsed — rely on human discipline (backward compatible)
+    # Parallel slices must declare Files for overlap detection
+    echo -e "${RED}[overlap-gate] BLOCK: Stage $stage_num — parallel slices require Files declaration${NC}" >&2
+    echo -e "${RED}  Add '- **Files:** file1, file2' to each slice in the epic plan.${NC}" >&2
     rm -f "$tmpfile"
-    return 0
+    return 1
   fi
 
   local duplicates
@@ -609,6 +647,66 @@ check_slice_overlap() {
 
   rm -f "$tmpfile"
   return 0
+}
+
+# classify_slice_repo — extract repo paths from a slice's Files list
+# Args: slice_index
+# Output: one repo path per line (deduplicated). Empty Files → all repos.
+classify_slice_repo() {
+  local idx="$1"
+  local files="${SLICE_FILES[$idx]:-}"
+
+  if [ -z "$files" ]; then
+    discover_git_repos 2>/dev/null
+    return
+  fi
+
+  local all_repos_file
+  all_repos_file=$(mktemp -t harvest-repos.XXXXXX)
+  discover_git_repos 2>/dev/null > "$all_repos_file"
+
+  echo "$files" \
+    | sed 's/`//g; s/\[//g; s/\]//g' \
+    | tr ',' '\n' \
+    | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' \
+    | sed '/^$/d' \
+    | while IFS= read -r f; do
+        local matched=false
+        while IFS= read -r r; do
+          local rname
+          rname=$(basename "$r")
+          if [[ "$f" == "${rname}/"* ]]; then
+            echo "$r"
+            matched=true
+            break
+          fi
+        done < "$all_repos_file"
+        if ! $matched && [ -d "$PROJECT_DIR/.git" ]; then
+          echo "$PROJECT_DIR"
+        fi
+      done | sort -u
+
+  rm -f "$all_repos_file"
+}
+
+# recover_dependencies — restore missing/stale deps after APPROVE'd slice skip
+# Checks package.json → node_modules for each discovered repo.
+recover_dependencies() {
+  [ "$DRY_RUN" = true ] && return 0
+
+  while IFS= read -r repo_dir; do
+    if [ -f "$repo_dir/package.json" ]; then
+      if [ ! -d "$repo_dir/node_modules" ]; then
+        echo -e "${YELLOW}[dep-recover] $(basename "$repo_dir"): node_modules missing — running npm install${NC}"
+        ( cd "$repo_dir" && npm install --no-audit --no-fund 2>&1 | tail -1 ) || \
+          echo -e "${RED}[dep-recover] npm install failed in $(basename "$repo_dir")${NC}" >&2
+      elif [ "$repo_dir/package.json" -nt "$repo_dir/node_modules/.package-lock.json" ] 2>/dev/null; then
+        echo -e "${YELLOW}[dep-recover] $(basename "$repo_dir"): package.json newer — running npm install${NC}"
+        ( cd "$repo_dir" && npm install --no-audit --no-fund 2>&1 | tail -1 ) || \
+          echo -e "${RED}[dep-recover] npm install failed in $(basename "$repo_dir")${NC}" >&2
+      fi
+    fi
+  done < <(discover_git_repos 2>/dev/null)
 }
 
 # Per-slice worktree helpers — opt-in via HARVEST_PARALLEL_WORKTREE=1.
@@ -696,8 +794,25 @@ commit_stage() {
 
   local committed=false
 
+  # Re-discover repos (may include repos created mid-epic)
+  local current_repos=()
+  while IFS= read -r _cr; do
+    current_repos+=("$_cr")
+  done < <(discover_git_repos 2>/dev/null)
+
+  # Log newly discovered repos
+  for cr in "${current_repos[@]}"; do
+    local is_known=false
+    for kr in "${EPIC_KNOWN_REPOS[@]}"; do
+      [ "$cr" = "$kr" ] && is_known=true && break
+    done
+    if ! $is_known; then
+      echo -e "  ${YELLOW}[commit_stage] New repo detected: $(basename "$cr") (no epic branch)${NC}"
+    fi
+  done
+
   # Commit in each git repo that has changes
-  while IFS= read -r repo_dir; do
+  for repo_dir in "${current_repos[@]}"; do
     cd "$repo_dir"
 
     if [ -z "$(git status --porcelain)" ]; then
@@ -731,7 +846,7 @@ commit_stage() {
       echo "  Run 'cd ${repo_dir} && git push' manually."
     fi
     committed=true
-  done < <(discover_git_repos)
+  done
 
   if ! $committed; then
     echo -e "${YELLOW}! No changes to commit for Stage $stage_num${NC}"
@@ -772,6 +887,28 @@ run_parallel_stage() {
   # Overlap gate — refuse to launch if any two slices target the same file
   if ! check_slice_overlap "$stage_num" "${indices[@]}"; then
     return 1
+  fi
+
+  # Warn if parallel slices target the same repo (worktree recommended)
+  if $IS_MULTI_REPO; then
+    local repo_map_file
+    repo_map_file=$(mktemp -t harvest-repo-map.XXXXXX)
+    for idx in "${indices[@]}"; do
+      while IFS= read -r repo_path; do
+        echo "${repo_path}|${idx}" >> "$repo_map_file"
+      done < <(classify_slice_repo "$idx")
+    done
+    local dup_repos
+    dup_repos=$(awk -F'|' '{print $1}' "$repo_map_file" | sort | uniq -d)
+    if [ -n "$dup_repos" ]; then
+      while IFS= read -r dup_repo; do
+        local slice_list
+        slice_list=$(awk -F'|' -v r="$dup_repo" '$1 == r {print $2}' "$repo_map_file" | tr '\n' ' ')
+        echo -e "${YELLOW}[parallel-warn] Same repo '$(basename "$dup_repo")' targeted by slices: ${slice_list}${NC}"
+        echo -e "${YELLOW}  Consider HARVEST_PARALLEL_WORKTREE=1 for safe isolation${NC}"
+      done <<< "$dup_repos"
+    fi
+    rm -f "$repo_map_file"
   fi
 
   # Per-slice worktree bookkeeping (only populated when WORKTREE_ENABLED=1)
@@ -816,6 +953,7 @@ run_parallel_stage() {
           pv=$(grep "^VERDICT=" "$par_status" 2>/dev/null | tail -1 | cut -d= -f2 | tr -d "'" || true)
           if [ "$pv" = "APPROVE" ]; then
             echo -e "  ${GREEN}Skip: Slice $((idx+1)) already APPROVE'd${NC}"
+            recover_dependencies
             continue
           fi
         fi
@@ -1027,6 +1165,7 @@ for stage_num in $(seq 1 "$STAGE_COUNT"); do
         prev_verdict=$(grep "^VERDICT=" "$seq_status" 2>/dev/null | tail -1 | cut -d= -f2 | tr -d "'" || true)
         if [ "$prev_verdict" = "APPROVE" ]; then
           echo -e "  ${GREEN}Skip: Slice $((local_idx+1)) already APPROVE'd${NC}"
+          recover_dependencies
           COMPLETED_STAGES=$((COMPLETED_STAGES+1))
           write_epic_status "COMPLETED_STAGES=${COMPLETED_STAGES}"
           continue
@@ -1083,6 +1222,7 @@ for stage_num in $(seq 1 "$STAGE_COUNT"); do
     fi
   else
     # Parallel execution: multiple slices in this stage
+    recover_dependencies
     if ! run_parallel_stage "$stage_num" "${stage_indices[@]}"; then
       echo ""
       echo "Completed stages: $COMPLETED_STAGES/$STAGE_COUNT"

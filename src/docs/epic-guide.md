@@ -147,20 +147,41 @@ When writing an Epic plan, check the following:
 
 ## Multi-Repo Workspaces
 
-When the workspace root has no `.git/` and subdirectories (e.g., `backend/`, `frontend/`) are each independent git repos.
+Three workspace layouts are supported:
+
+| Layout | Root `.git/` | Sub-repo `.git/` | `IS_MULTI_REPO` | Example |
+|--------|-------------|-------------------|-----------------|---------|
+| Single | Yes | No | `false` | Standard single-repo project |
+| Pure multi | No | Yes | `true` | `backend/`, `frontend/` each with `.git/` |
+| Hybrid | Yes | Yes | `true` | Root `.git/` for infra + sub-repos for apps |
+
+`discover_git_repos()` returns all repos (root + independent sub-repos). Git submodules are automatically excluded.
+
+### Repos Created Mid-Epic
+If a Stage creates a new sub-repo (e.g., `kody-backend/` initialized via `git init`):
+- `commit_stage()` re-discovers repos and commits changes in the new repo
+- `finalize_epic_branch()` skips the new repo (it has no epic branch to merge)
+- A log message notes the new repo for visibility
 
 ### commit_stage() Behavior
-- First checks if the workspace root is a git repo
-- If not a git repo, scans immediate subdirectories for those with `.git/`
+- Re-discovers repos at commit time (catches repos created during earlier stages)
 - Commits and pushes independently in each repo that has changes
 - Adds `[repo-name]` prefix to commit messages: `feat: Stage 1 [backend] — auth API`
 
 ### Planner Considerations
 - Prefix repo names in Slice Files fields: `backend/src/api/auth.ts`
 - Specify the target repo with a `**Repo:**` field in each Slice
+- **Files declaration is required for parallel slices** — the overlap gate blocks parallel stages where any slice lacks a Files list
 - The file overlap rule within the same Stage applies across the entire workspace (not per repo)
 - Slices that modify only different repos are safe for parallel execution
+- If parallel slices target the same repo, `HARVEST_PARALLEL_WORKTREE=1` is recommended
 - Cross-repo dependencies (e.g., API change -> UI update) should be separated into different Stages
+
+### Dependency Recovery
+When re-running an epic, previously APPROVE'd slices are skipped. The system automatically checks for missing dependencies:
+- If `package.json` exists but `node_modules/` is missing → runs `npm install`
+- If `package.json` is newer than `node_modules/.package-lock.json` → runs `npm install`
+- Runs before parallel stage entry and after each APPROVE'd slice skip
 
 ### Reviewer Considerations
 - Independently run git status -> add -> commit -> push in each repo
