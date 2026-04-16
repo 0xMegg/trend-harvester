@@ -88,18 +88,32 @@ check_harness_version() {
   local vfile="$PROJECT_DIR/.claude/.harness-version"
   local origin_file="$PROJECT_DIR/.claude/.harness-origin"
 
+  # Auto-bootstrap: create missing files so first-time projects don't silently skip
   if [ ! -f "$vfile" ]; then
-    echo -e "${YELLOW}⚠ .claude/.harness-version not found — run setup.sh or build-template.sh first${NC}" >&2
-    return 0
+    echo -e "${YELLOW}⚠ .claude/.harness-version not found — creating bootstrap stamp${NC}" >&2
+    mkdir -p "$(dirname "$vfile")"
+    cat > "$vfile" << BVEOF
+HARNESS_VERSION=4.0.0
+FORGE_COMMIT=bootstrap
+BUILD_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+BVEOF
+    echo -e "${GREEN}  ✓ Created .claude/.harness-version (bootstrap)${NC}" >&2
   fi
 
   # shellcheck disable=SC1090
   source "$vfile"
   echo -e "${CYAN}  Harness: v${HARNESS_VERSION:-?} (forge ${FORGE_COMMIT:-?}, built ${BUILD_TIMESTAMP:-?})${NC}" >&2
 
+  # Auto-bootstrap: create .harness-origin with default template path
   if [ ! -f "$origin_file" ]; then
-    echo -e "${YELLOW}⚠ .claude/.harness-origin not found — cannot auto-update${NC}" >&2
-    return 0
+    echo -e "${YELLOW}⚠ .claude/.harness-origin not found — creating with default path${NC}" >&2
+    mkdir -p "$(dirname "$origin_file")"
+    cat > "$origin_file" << 'BOEOF'
+# Harness template origin — used by run-epic/run-task for auto-sync.
+# Edit TEMPLATE_REPO to match your local template repo path.
+TEMPLATE_REPO=../claude-code-harness-template
+BOEOF
+    echo -e "${GREEN}  ✓ Created .claude/.harness-origin (edit TEMPLATE_REPO if needed)${NC}" >&2
   fi
 
   # shellcheck disable=SC1090

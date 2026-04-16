@@ -56,6 +56,33 @@ BUILD_TIMESTAMP=$FORGE_TIMESTAMP
 VEOF
 echo "  Version stamp: .claude/.harness-version (forge $FORGE_HASH)"
 
+# Write harness-origin so target projects can auto-sync back to this template
+ORIGIN_FILE="$OUT_DIR/.claude/.harness-origin"
+if [ ! -f "$ORIGIN_FILE" ]; then
+  cat > "$ORIGIN_FILE" << 'OEOF'
+# Harness template origin — used by run-epic/run-task for auto-sync.
+# Edit TEMPLATE_REPO to match your local template repo path.
+TEMPLATE_REPO=../claude-code-harness-template
+OEOF
+  echo "  Origin stamp: .claude/.harness-origin (created)"
+else
+  echo "  Origin stamp: .claude/.harness-origin (exists, preserved)"
+fi
+
+# CLAUDE.md size guard — context performance degrades beyond 200 lines
+CLAUDEMD="$OUT_DIR/CLAUDE.md"
+if [ -f "$CLAUDEMD" ]; then
+  CLAUDEMD_LINES=$(wc -l < "$CLAUDEMD" | tr -d ' ')
+  if [ "$CLAUDEMD_LINES" -gt 250 ]; then
+    echo -e "${RED}✗ CLAUDE.md is $CLAUDEMD_LINES lines (limit: 250). Move content to skills/rules.${NC}"
+    exit 1
+  elif [ "$CLAUDEMD_LINES" -gt 200 ]; then
+    echo -e "${YELLOW}⚠ CLAUDE.md is $CLAUDEMD_LINES lines (recommended max: 200). Consider splitting.${NC}"
+  else
+    echo "  CLAUDE.md: $CLAUDEMD_LINES lines (OK)"
+  fi
+fi
+
 # Ensure scripts are executable
 find "$OUT_DIR/scripts" -name '*.sh' -exec chmod +x {} \; 2>/dev/null || true
 [ -f "$OUT_DIR/setup.sh" ] && chmod +x "$OUT_DIR/setup.sh"

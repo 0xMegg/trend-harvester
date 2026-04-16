@@ -86,19 +86,32 @@ check_harness_version() {
   local vfile="$PROJECT_DIR/.claude/.harness-version"
   local origin_file="$PROJECT_DIR/.claude/.harness-origin"
 
+  # Auto-bootstrap: create missing files so first-time projects don't silently skip
   if [ ! -f "$vfile" ]; then
-    echo -e "${YELLOW}⚠ .claude/.harness-version not found — run setup.sh or build-template.sh first${NC}" >&2
-    return 0
+    echo -e "${YELLOW}⚠ .claude/.harness-version not found — creating bootstrap stamp${NC}" >&2
+    mkdir -p "$(dirname "$vfile")"
+    cat > "$vfile" << BVEOF
+HARNESS_VERSION=4.0.0
+FORGE_COMMIT=bootstrap
+BUILD_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+BVEOF
+    echo -e "${GREEN}  ✓ Created .claude/.harness-version (bootstrap)${NC}" >&2
   fi
 
   # shellcheck disable=SC1090
   source "$vfile"
   echo -e "${CYAN}  Harness: v${HARNESS_VERSION:-?} (forge ${FORGE_COMMIT:-?}, built ${BUILD_TIMESTAMP:-?})${NC}" >&2
 
-  # Need .harness-origin to know where the template repo is
+  # Auto-bootstrap: create .harness-origin with default template path
   if [ ! -f "$origin_file" ]; then
-    echo -e "${YELLOW}⚠ .claude/.harness-origin not found — cannot auto-update. Create it with: echo 'TEMPLATE_REPO=../claude-code-harness-template' > .claude/.harness-origin${NC}" >&2
-    return 0
+    echo -e "${YELLOW}⚠ .claude/.harness-origin not found — creating with default path${NC}" >&2
+    mkdir -p "$(dirname "$origin_file")"
+    cat > "$origin_file" << 'BOEOF'
+# Harness template origin — used by run-epic/run-task for auto-sync.
+# Edit TEMPLATE_REPO to match your local template repo path.
+TEMPLATE_REPO=../claude-code-harness-template
+BOEOF
+    echo -e "${GREEN}  ✓ Created .claude/.harness-origin (edit TEMPLATE_REPO if needed)${NC}" >&2
   fi
 
   # shellcheck disable=SC1090
@@ -1008,65 +1021,80 @@ run_parallel_stage() {
 
     echo "  Waiting for batch to complete..."
 
-    # D: Background progress monitor — polls task-status files every 10s
-    _monitor_pids=()
+    # D: Foreground progress monitor — polls task-status files every 10s inline
+    #    (no background subshell, so output appears directly in the main stream)
     if [ ${#pids[@]} -gt 0 ] && [ "$DRY_RUN" = false ]; then
-      (
-        local prev_states=""
-        while true; do
-          sleep 10
-          local states=""
-          for m_idx in "${pid_to_idx[@]}"; do
-            local sf="${LOG_DIR}/task-slice-${m_idx}/task-status"
-            if [ -f "$sf" ]; then
-              local role="" iter="" verdict=""
-              role=$(grep "^ROLE=" "$sf" 2>/dev/null | tail -1 | cut -d= -f2 | tr -d "'" || true)
-              iter=$(grep "^ITER=" "$sf" 2>/dev/null | tail -1 | cut -d= -f2 | tr -d "'" || true)
-              verdict=$(grep "^VERDICT=" "$sf" 2>/dev/null | tail -1 | cut -d= -f2 | tr -d "'" || true)
-              states="${states}  S$((m_idx+1)):${role:-?}"
-              [ -n "$iter" ] && [ "$iter" != "1" ] && states="${states}(i${iter})"
-              [ -n "$verdict" ] && states="${states}→${verdict}"
+      local prev_states=""
+      declare -A _pid_done=()   # track which PIDs have been reaped
+      declare -A _pid_rc=()     # exit codes
+
+      while true; do
+        # Check for newly finished PIDs (non-blocking via kill -0)
+        local any_alive=false
+        for p_idx in "${!pids[@]}"; do
+          local pid="${pids[$p_idx]}"
+          [ -n "${_pid_done[$pid]:-}" ] && continue  # already reaped
+          if ! kill -0 "$pid" 2>/dev/null; then
+            # Process finished — reap immediately to collect exit code
+            local wait_rc=0
+            wait "$pid" || wait_rc=$?
+            _pid_done[$pid]=1
+            _pid_rc[$pid]=$wait_rc
+            local s_idx="${pid_to_idx[$p_idx]}"
+            if [ "$wait_rc" -eq 0 ]; then
+              echo -e "  ${GREEN}✓ Slice $((s_idx+1)) complete${NC}"
             else
-              states="${states}  S$((m_idx+1)):init"
+              echo -e "  ${RED}✗ Slice $((s_idx+1)) failed (exit $wait_rc)${NC}"
+              all_ok=false
+              failed_slices+=("$s_idx")
             fi
-          done
-          # Only print when state changes
-          if [ "$states" != "$prev_states" ]; then
-            echo -e "  ${CYAN}[progress]${states}${NC}"
-            prev_states="$states"
+          else
+            any_alive=true
           fi
-          # Exit if no background PIDs are alive
-          local any_alive=false
-          for check_pid in "${pids[@]}"; do
-            kill -0 "$check_pid" 2>/dev/null && any_alive=true && break
-          done
-          $any_alive || break
         done
-      ) &
-      _monitor_pids+=($!)
+
+        # All done — exit the loop
+        $any_alive || break
+
+        # Read and display progress from task-status files
+        local states=""
+        for m_idx in "${pid_to_idx[@]}"; do
+          local sf="${LOG_DIR}/task-slice-${m_idx}/task-status"
+          if [ -f "$sf" ]; then
+            local role="" iter="" verdict=""
+            role=$(grep "^ROLE=" "$sf" 2>/dev/null | tail -1 | cut -d= -f2 | tr -d "'" || true)
+            iter=$(grep "^ITER=" "$sf" 2>/dev/null | tail -1 | cut -d= -f2 | tr -d "'" || true)
+            verdict=$(grep "^VERDICT=" "$sf" 2>/dev/null | tail -1 | cut -d= -f2 | tr -d "'" || true)
+            states="${states}  S$((m_idx+1)):${role:-?}"
+            [ -n "$iter" ] && [ "$iter" != "1" ] && states="${states}(i${iter})"
+            [ -n "$verdict" ] && states="${states}→${verdict}"
+          else
+            states="${states}  S$((m_idx+1)):init"
+          fi
+        done
+        if [ "$states" != "$prev_states" ]; then
+          echo -e "  ${CYAN}[progress]${states}${NC}"
+          prev_states="$states"
+        fi
+
+        sleep 10
+      done
+    elif [ "$DRY_RUN" = true ]; then
+      # Dry-run: just wait for all PIDs sequentially
+      for p_idx in "${!pids[@]}"; do
+        local pid="${pids[$p_idx]}"
+        local s_idx="${pid_to_idx[$p_idx]}"
+        local wait_rc=0
+        wait "$pid" || wait_rc=$?
+        if [ "$wait_rc" -eq 0 ]; then
+          echo -e "  ${GREEN}✓ Slice $((s_idx+1)) complete${NC}"
+        else
+          echo -e "  ${RED}✗ Slice $((s_idx+1)) failed (exit $wait_rc)${NC}"
+          all_ok=false
+          failed_slices+=("$s_idx")
+        fi
+      done
     fi
-
-    # Wait for all PIDs in this batch (|| true prevents set -e from killing us)
-    for p_idx in "${!pids[@]}"; do
-      local pid="${pids[$p_idx]}"
-      local s_idx="${pid_to_idx[$p_idx]}"
-      local wait_rc=0
-
-      wait "$pid" || wait_rc=$?
-
-      if [ "$wait_rc" -eq 0 ]; then
-        echo -e "  ${GREEN}✓ Slice $((s_idx+1)) complete${NC}"
-      else
-        echo -e "  ${RED}✗ Slice $((s_idx+1)) failed (exit $wait_rc)${NC}"
-        all_ok=false
-        failed_slices+=("$s_idx")
-      fi
-    done
-
-    # Stop progress monitor
-    for mp in "${_monitor_pids[@]}"; do
-      kill "$mp" 2>/dev/null; wait "$mp" 2>/dev/null || true
-    done
 
     batch_start=$batch_end
   done

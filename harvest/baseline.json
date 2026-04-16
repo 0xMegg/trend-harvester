@@ -2,7 +2,7 @@
   "score": 57,
   "max": 100,
   "mode": "quick",
-  "timestamp": "2026-04-14T06:29:00Z",
+  "timestamp": "2026-04-16T03:02:28Z",
   "breakdown": {
     "rules": {
       "score": 9,
@@ -22,12 +22,12 @@
     "guidance": {
       "score": 7,
       "max": 10,
-      "detail": "16 files, 932 lines"
+      "detail": "16 files, 949 lines"
     },
     "scripts": {
       "score": 10,
       "max": 10,
-      "detail": "8 scripts, 8 HARD, 8 pipefail"
+      "detail": "9 scripts, 9 HARD, 9 pipefail"
     },
     "templates": {
       "score": 8,
