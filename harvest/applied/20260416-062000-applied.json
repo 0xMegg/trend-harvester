@@ -1,0 +1,23 @@
+[
+  {
+    "id": "ws-claudemd-size-guard",
+    "applied_at": "2026-04-16T02:42:00Z",
+    "description": "CLAUDE.md 200줄 제한 빌드 가드 — build-template.sh에 line count 체크 추가",
+    "target_file": "scripts/build-template.sh",
+    "fitness_score": 9,
+    "gate2_result": "pass (57→57)",
+    "source_url": "https://ranthebuilder.cloud/blog/claude-code-best-practices-lessons-from-real-projects/"
+  },
+  {
+    "id": "manual-epic-monitor-foreground",
+    "applied_at": "2026-04-16T02:42:00Z",
+    "description": "Epic 진행률 모니터 2중 수정 — (1) 모니터 one-liner를 scripts/epic-monitor.sh로 추출 (#!/bin/bash shebang으로 zsh 호환성 해결), (2) epic.md에서 run_in_background 대신 CronCreate로 교체 (출력 위치 문제 해결)",
+    "target_files": ["src/scripts/epic-monitor.sh (NEW)", "src/.claude/commands/epic.md"],
+    "fitness_score": 7,
+    "gate2_result": "pass (57→57)",
+    "layers": {
+      "zsh_compat": "one-liner → standalone script with #!/bin/bash",
+      "output_location": "run_in_background → CronCreate (conversation stream)"
+    }
+  }
+]
