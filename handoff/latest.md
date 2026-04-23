@@ -1,3 +1,54 @@
+# Handoff — 2026-04-23 PM-6 (Option Y Phase 0 — rules base/local split)
+
+## What Changed (PM-6)
+auto-apply 모델 진입 준비로 `.claude/rules/` 를 `base/` (managed) + `local/` (seed) 로 경로 분리. kody 의 Epic 7 F-01/F-02 + K4/K5 커스텀 학습이 로컬에 보존되도록 구조화. Plan: `~/.claude/plans/y-0-indexed-zebra.md`.
+
+### Forge 커밋 3건
+- `1192226 refactor: split .claude/rules/ into base/ and local/ (Option Y Phase 0-A1)` — git mv 5개 + local/README.md + manifest 분리
+- `16291ae docs: update references to .claude/rules/ layout (Option Y Phase 0-A2)` — CLAUDE.md, setup.sh, harness-report.sh 등 15 파일 참조 업데이트 + harvest pipeline canonical target 분기(프로젝트 local 기본, harness-wide 는 template PR)
+- `5fdf9ff fix: extend post-edit-size-check to base/ and local/ (Option Y Phase 0-A3)` — 훅 case glob `*/.claude/rules/*/*.md` 로 확장
+
+### Template 커밋
+- `3a07491 chore: template update from harness-forge (5fdf9ff) — Option Y rules split` — rsync 자동으로 base/ local/ 구조 반영
+
+### 다운스트림 마이그레이션
+| 프로젝트 | 상태 | 주요 내용 |
+|---|---|---|
+| divebase | dev HEAD `8fd4744` | 커스텀 없음 — 단순 이동 (`3345d6f`) + apply (`8fd4744`). base 5개 template 바이트 일치 |
+| kody-workspace | dev HEAD `c991658` | base 이동 + kody 커스텀 추출 (`247f921`) + apply (`c991658`). local/{gotchas-kody.md, frontend-kody.md} 생성. task/K2-K3 WIP 은 stash → merge dev → stash pop 으로 보존 |
+
+### kody 추출 상세
+- `local/gotchas-kody.md` — Epic 7 F-01/F-02 pitfall 3줄
+- `local/frontend-kody.md` — "Theme-Aware Styling (kody OMS 3-variant)" + Scope + 근거 (K4/K5 clarification 포함, 13줄 분량)
+- base/{gotchas,frontend}.md — kody 추가분 제거 후 template 바이트 일치 ✅
+- base/git.md — pre-PM3 상태라 3줄 부족했던 게 upgrade-harness.sh apply 로 채워짐
+
+### 검증 결과
+- divebase + kody 모두 `base/*.md` 5개 전부 template 바이트 일치
+- harness-report: Rules 5/20 (base 만 집계), Local rules informational 라인 (divebase=0 조용, kody=2)
+- upgrade-harness.sh dry-run: Unknown 0, Managed overwrite 에 `local/*.md` 포함 안 됨 ([seed] 보호 확인)
+
+### 실수 + 복구
+kody 초기 commit 에 `git add -A` 로 task/K2-K3 runtime artifacts (`.scheduled_tasks.lock`, `outputs/plans/task-K2-K3-*`, `outputs/archive/*`) 가 섞여 들어감. push 전이라 `git reset --mixed` 후 `git add .claude/rules/` 로 선별 staging → `247f921` 로 깨끗하게 재커밋.
+
+## ⚠ 다운스트림 커밋 미푸시
+메모리 규칙("다운스트림은 사용자가 확인 후 푸시")에 따라 각 프로젝트 커밋은 로컬에 둠:
+- divebase main: `c4076d3 → 3345d6f → 8fd4744` (3 ahead of origin)
+- kody dev: `521fad7 → 247f921 → c991658` (2 ahead of origin/dev)
+- kody task/K2-K3: dev fast-forward + stash 복원 상태 (작업 재개 가능)
+
+## 후속 Phase 진입 조건 충족
+- **Phase 1** (docs/updates/ 소급 + INDEX.md + 커밋 convention) — Option Y Phase 0 가 첫 update entry 후보
+- **Phase 2** (auto-apply, run-task/run-epic 가 pending 업데이트 감지 시 자동 적용) — local/ [seed] 로 안전 확보됨
+
+## Current State (PM-6 종료 시점)
+- **forge HEAD**: `5fdf9ff` (origin/main 3 ahead, PM-6 handoff 커밋 추가 예정)
+- **template HEAD**: `3a07491` (origin/main 1 ahead, 이전 push 포함 정상 동기)
+- **divebase HEAD**: `8fd4744` (unpushed)
+- **kody dev HEAD**: `c991658` (unpushed), task/K2-K3 동기 후 작업 재개 가능
+
+---
+
 # Handoff — 2026-04-23 PM-5 (kody E10/P1-4 — post-task handoff gate)
 
 ## What Changed (PM-5)
