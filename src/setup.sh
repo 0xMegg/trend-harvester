@@ -114,17 +114,32 @@ echo "[6.5/7] Copying automation scripts..."
 cp "$TEMPLATE_DIR/scripts/"*.sh "$TARGET_DIR/scripts/"
 chmod +x "$TARGET_DIR/scripts/"*.sh
 
-# Write harness-origin for auto-update (points to template repo)
-cat > "$TARGET_DIR/.claude/.harness-origin" << 'HEOF'
-# Harness template origin — used by run-epic/run-task for auto-sync.
+# Write harness-origin pointing at the template dir we were invoked from.
+# Absolute path avoids the broken default ("../claude-code-harness-template"
+# as a sibling) that assumed a specific workspace layout. Each project
+# owns this file (seed in .harness-manifest) and may edit later.
+cat > "$TARGET_DIR/.claude/.harness-origin" << HEOF
+# Harness template origin — used by scripts/upgrade-harness.sh.
 # Edit TEMPLATE_REPO to match your local template repo path.
-TEMPLATE_REPO=../claude-code-harness-template
+TEMPLATE_REPO=$TEMPLATE_DIR
 HEOF
 
 # Copy harness-version stamp if present in template
 if [ -f "$TEMPLATE_DIR/.claude/.harness-version" ]; then
   cp "$TEMPLATE_DIR/.claude/.harness-version" "$TARGET_DIR/.claude/.harness-version"
 fi
+
+# Copy .harness-manifest (declares per-file ownership policy for upgrade-harness.sh)
+if [ -f "$TEMPLATE_DIR/.harness-manifest" ]; then
+  cp "$TEMPLATE_DIR/.harness-manifest" "$TARGET_DIR/.harness-manifest"
+fi
+
+# Copy harness-provided docs (epic-guide, plugin-guide, troubleshooting, assumptions)
+for d in epic-guide plugin-guide troubleshooting assumptions; do
+  if [ -f "$TEMPLATE_DIR/docs/$d.md" ]; then
+    cp "$TEMPLATE_DIR/docs/$d.md" "$TARGET_DIR/docs/$d.md"
+  fi
+done
 
 # Copy PlaceholderGuide (AI reads this during init session)
 if [ -f "$TEMPLATE_DIR/PlaceholderGuide.md" ]; then

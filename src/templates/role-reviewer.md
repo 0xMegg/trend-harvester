@@ -60,6 +60,29 @@ Static code review is insufficient for UI/API tasks.
 
 Skip this step for pure logic/refactoring tasks with no UI/API changes.
 
+## Dead-Code Guard (new public API)
+A public prop / flag / export / hook added in this diff MUST have at least
+one call-site that uses it:
+
+- Search for the symbol across `<src_roots>/`. If zero real usages (definition
+  and tests don't count), verdict is **REVISE** — new dead code is not
+  acceptable as "Stage 1 of a multi-stage feature."
+- Exception: the epic plan explicitly declares "Stage X will set this" and
+  the call-site Stage exists in the plan. In that case record "Unused,
+  scheduled for Stage X" under `## Carry over to next Task` and allow APPROVE.
+- Trust the handoff's `## Follow-up call-sites` section — if Developer listed
+  files that should adopt the new API but didn't touch them, verify the
+  Planner scheduled them; otherwise REVISE.
+
+## Long-Running Process Hygiene
+When verifying UI/API tasks, any dev server, watcher, or tunnel started
+during review MUST be terminated before writing the verdict:
+
+1. Start with `run_in_background: true`
+2. Track PID, kill when verification passes, `ps | grep <name>` to confirm
+3. A running dev server across slice boundary is a bug-in-review, not a
+   successful verification — do not APPROVE with leaked processes
+
 ## Anti-Dismissal Rule
 If you find an issue, do not self-invalidate it.
 - If your first impression is "this could be a problem," classify it as Important at minimum

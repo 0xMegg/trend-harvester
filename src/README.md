@@ -98,6 +98,36 @@ Evaluation: Record 5 key metrics per Task using templates/evaluation.md
 
 ---
 
+## Upgrading an Existing Project (harness already installed)
+
+When the template repo has new changes and you want to pull them into an
+existing project without clobbering project-owned files:
+
+```bash
+cd /path/to/existing-project
+bash scripts/upgrade-harness.sh             # dry-run (default — nothing changes)
+bash scripts/upgrade-harness.sh --apply     # perform the update
+```
+
+The tool consumes `.harness-manifest` from the template repo (pointed to
+by `.claude/.harness-origin`) and classifies each template file:
+
+- **managed**: harness owns it — overwritten with template version
+- **seed**: seeded once — skipped if the project already has it (custom
+  CLAUDE.md, .gitignore, per-project skill workflows, etc. are safe)
+- **ignore**: project-local state — never touched
+
+Override template path for one-off runs (e.g. broken `.harness-origin`):
+
+```bash
+TEMPLATE_REPO=/abs/path/to/template bash /abs/path/to/template/scripts/upgrade-harness.sh
+```
+
+Dry-run always runs first. Review the overwrite list; nothing changes
+until `--apply`. One project at a time — never batch-upgrade.
+
+---
+
 ## Applying to an Existing Project
 
 ```bash
@@ -185,11 +215,13 @@ project/
 │   └── archive/                           # Resolved past documents
 ├── scripts/
 │   ├── run-task.sh                        # Single Task auto-execution (--no-commit support)
-│   └── run-epic.sh                        # Epic decomposition + Stage integrated commit
+│   ├── run-epic.sh                        # Epic decomposition + Stage integrated commit
+│   └── upgrade-harness.sh                 # Manifest-based template → project sync (dry-run default)
 ├── docs/
 │   ├── project-plan.md                    # Project plan template
 │   ├── plugin-guide.md                    # Plugin structure, security checklist, deployment strategy
 │   └── epic-guide.md                      # Epic decomposition criteria, parallel execution, failure recovery
+├── .harness-manifest                      # Per-file ownership policy (managed/seed/ignore)
 ├── PlaceholderGuide.md                    # For initialization session: placeholder filling guide
 ├── setup.sh                               # New project initialization script
 └── README.md
