@@ -1,3 +1,61 @@
+# Handoff — 2026-04-23 PM-7 (kody P0-6 — write_status() multiline corruption)
+
+## What Changed (PM-7)
+kody 가 E11 addendum (`b13cae3`) 로 또 다른 P0 리포트. TASK 인자에 줄바꿈이 있으면 `/task` 2회 연속 실행 시 status 파일이 깨져 exit. 핵심 원인 + fix + 회귀 테스트.
+
+### 재현 (baseline)
+```
+# run 1 (멀티라인 TASK)
+run-task.sh --dry-run "$(printf 'Line 1\nLine 2 with (parens)\nLine 3')"
+# → status 파일에 TASK_NAME='Line 1\nLine 2 with (parens)\nLine 3' 저장 (멀티라인 single-quoted)
+
+# run 2 (다른 멀티라인 TASK)
+run-task.sh --dry-run "$(printf 'Task K2+K3\nFiles:...')"
+# → write_status "TASK_NAME=..." 가 `grep -v "^TASK_NAME="` 로 첫 줄만 제거
+# → 기존 value 의 2/3번째 줄("Line 2 with (parens)", "Line 3") 이 raw text 로 잔류
+# → /tmp/.../task-status: line 1: syntax error near unexpected token '('
+```
+
+### Fix (P0-6 옵션 1 — 설계 변경)
+status 파일에 멀티라인 value 자체를 금지. `$TASK` 원본 shell 변수는 건드리지 않아서 phase 프롬프트는 그대로 멀티라인.
+
+- `src/scripts/run-task.sh` — `_sanitize_val()` 신규: `\n`/`\r` → space, multi-space 압축, 120자 이상 truncate. `write_status()` 각 pair 처리 직후 적용
+- `src/scripts/run-epic.sh` — `write_epic_status()` 에 동일 패턴 (EPIC_NAME 도 멀티라인 가능성 대비)
+- `src/scripts/verify-status-file.sh` (신규, manifest 등록) — 회귀 테스트 5 케이스 (single / multiline+parens+backticks / 5회 반복 / line 수 상한 / 200자 truncate marker)
+
+### 검증
+- baseline 재현: `/tmp/p06-bug` 에서 run 2 시 `line 1: syntax error near unexpected token '('` 확정
+- fix 후: run 1/2 둘 다 exit 0, `source` exit 0, TASK_NAME 이 단일라인으로 저장 (`'Line 1 Line 2 with (parens) Line 3 with \`backticks\`'`)
+- `verify-status-file.sh` → **PASS (5 cases)**
+- shellcheck: run-task/run-epic 새 경고 0
+
+### Before/After status 파일 샘플
+**Before (corruption):**
+```
+Line 2 with (parens)
+Line 3 with `backticks`'
+TASK_NAME='Task K2+K3...  (새 value 뒤에 추가됨)
+...
+```
+**After (sanitized):**
+```
+TASK_NAME='Task K2+K3 — refactor Files: - app/(main)/page.tsx - lib/components/Table.tsx Done when: tests pass'
+...
+```
+
+### 커밋
+- `b13cae3` docs: E11/P0-6 addendum (이전 세션 push)
+- `657575d` fix: P0-6 write_status sanitize + verify-status-file.sh
+
+둘 다 `docs/kody-h3-update` 브랜치에 있음. 이 handoff 커밋 후 main ff-merge 예정.
+
+## Current State (PM-7 종료 시점)
+- **forge branch**: `docs/kody-h3-update` `657575d`, main ff-merge 예정
+- **template HEAD**: `3a07491` (PM-6 상태, 이번 fix 반영 필요 — build-template 예정)
+- **다운스트림**: divebase/kody 아직 미푸시 상태 (PM-6 carry-over). 이 P0-6 fix 는 template 반영 후 각 다운스트림의 `upgrade-harness.sh` 로 전파
+
+---
+
 # Handoff — 2026-04-23 PM-6 (Option Y Phase 0 — rules base/local split)
 
 ## What Changed (PM-6)
