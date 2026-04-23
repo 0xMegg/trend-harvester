@@ -403,6 +403,28 @@ _quote_val() {
   printf "'%s'" "$escaped"
 }
 
+_sanitize_val() {
+  # Enforce the status-file contract: each value must be single-line.
+  # Collapse newlines/CR to spaces and truncate overlong strings.
+  # Without this, a multiline value breaks `grep -v "^KEY="` rewrite
+  # (removes only the first line, rest becomes raw script that
+  # `source $STATUS_FILE` later tries to execute → syntax error).
+  # The full original $TASK stays in-process; the status file is
+  # a display/monitor artifact, not a source of truth for prompts.
+  local v="$1"
+  local max_len="${2:-120}"
+  v="${v//$'\n'/ }"
+  v="${v//$'\r'/ }"
+  while [[ "$v" == *"  "* ]]; do v="${v//  / }"; done
+  # Trim leading/trailing spaces
+  v="${v#"${v%%[![:space:]]*}"}"
+  v="${v%"${v##*[![:space:]]}"}"
+  if [ "${#v}" -gt "$max_len" ]; then
+    v="${v:0:$((max_len-14))}... (truncated)"
+  fi
+  printf '%s' "$v"
+}
+
 write_status() {
   # Merge new KEY=VAL pairs into the status file atomically.
   # Values are single-quoted so `source` works identically in bash 3.2+ and zsh.
@@ -420,6 +442,7 @@ write_status() {
   for pair in "$@"; do
     key="${pair%%=*}"
     val="${pair#*=}"
+    val=$(_sanitize_val "$val")
     grep -v "^${key}=" "$tmp" > "${tmp}.new" 2>/dev/null || true
     mv "${tmp}.new" "$tmp"
     echo "${key}=$(_quote_val "$val")" >> "$tmp"

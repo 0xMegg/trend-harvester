@@ -430,6 +430,21 @@ _quote_val() {
   printf "'%s'" "$escaped"
 }
 
+_sanitize_val() {
+  # Enforce single-line status-file contract (see run-task.sh for rationale).
+  local v="$1"
+  local max_len="${2:-120}"
+  v="${v//$'\n'/ }"
+  v="${v//$'\r'/ }"
+  while [[ "$v" == *"  "* ]]; do v="${v//  / }"; done
+  v="${v#"${v%%[![:space:]]*}"}"
+  v="${v%"${v##*[![:space:]]}"}"
+  if [ "${#v}" -gt "$max_len" ]; then
+    v="${v:0:$((max_len-14))}... (truncated)"
+  fi
+  printf '%s' "$v"
+}
+
 write_epic_status() {
   local tmp="${EPIC_STATUS_FILE}.tmp.$$"
   local pair key val
@@ -443,6 +458,7 @@ write_epic_status() {
   for pair in "$@"; do
     key="${pair%%=*}"
     val="${pair#*=}"
+    val=$(_sanitize_val "$val")
     grep -v "^${key}=" "$tmp" > "${tmp}.new" 2>/dev/null || true
     mv "${tmp}.new" "$tmp"
     echo "${key}=$(_quote_val "$val")" >> "$tmp"

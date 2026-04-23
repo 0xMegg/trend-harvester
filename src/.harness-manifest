@@ -45,6 +45,7 @@ scripts/run-harvest.sh
 scripts/run-task.sh
 scripts/upgrade-harness.sh
 scripts/verify-parallel-worktree.sh
+scripts/verify-status-file.sh
 
 # Reusable document templates
 templates/**
