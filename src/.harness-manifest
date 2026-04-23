@@ -26,8 +26,11 @@
 .claude/skills/trend-harvest/**
 .claude/.harness-version
 
-# Top-level skills library (harness-provided workflows)
-skills/**
+# Top-level skills — only the meta checklist is harness-managed.
+# Individual skill workflows (bug-fix, code-review) ship as seed so
+# projects can rewrite them for their own domain (e.g. divebase has
+# its own DiveBase-named workflow).
+skills/SKILL-TEST-CHECKLIST.md
 
 # Harness-provided scripts (enumerate explicitly so project-local
 # scripts in the same dir stay untouched)
@@ -74,6 +77,12 @@ DRYRUN-NOTES.md
 # User-added skills under .claude/skills/ — the 3 managed above are
 # owned by the harness; any others are project-local.
 .claude/skills/**
+
+# Top-level skill workflows — seeded from harness defaults, then each
+# project may rewrite (DiveBase / kody / etc. tailor these to their
+# own bug-fix and code-review processes)
+skills/bug-fix/**
+skills/code-review/**
 
 # Project background / policy — users tailor these
 context/**
