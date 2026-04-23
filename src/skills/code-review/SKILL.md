@@ -39,7 +39,7 @@ Review code changes and provide actionable feedback organized by severity.
 - {{CRITICAL_CHECK_1}}
 
 #### Important (should fix)
-- Architecture rule violations (see .claude/rules/)
+- Architecture rule violations (see .claude/rules/base/ and .claude/rules/local/)
 - Missing tests for new behavior
 - Hardcoded values (config, URLs, colors)
 - {{IMPORTANT_CHECK_1}}

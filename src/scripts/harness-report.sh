@@ -147,7 +147,9 @@ echo -e "${CYAN}Checking rules...${NC}" >&2
 rules_score=0
 rule_count=0
 rules_lines=0
-rules_dir="$TARGET_DIR/.claude/rules"
+# Score only base/ (harness-owned baseline). local/ is project-free area,
+# not part of the harness baseline comparison.
+rules_dir="$TARGET_DIR/.claude/rules/base"
 if [ -d "$rules_dir" ]; then
   rule_count=$(find "$rules_dir" -name '*.md' -type f | wc -l | tr -d ' ')
   # Up to 10 files = 10 points (1 per file)
@@ -167,6 +169,13 @@ if [ -d "$rules_dir" ]; then
 fi
 add_score "rules" "$rules_score" 20 "${rule_count} files, ${rules_lines} lines"
 echo -e "  Rules: ${rules_score}/20 (${rule_count} files, ${rules_lines} lines)" >&2
+
+# Informational: count local/ files (not scored)
+local_rules_dir="$TARGET_DIR/.claude/rules/local"
+if [ -d "$local_rules_dir" ]; then
+  local_count=$(find "$local_rules_dir" -name '*.md' -type f -not -name 'README.md' | wc -l | tr -d ' ')
+  [ "$local_count" -gt 0 ] && echo -e "  Local rules: ${local_count} files (project-owned, not scored)" >&2
+fi
 
 # ============================================================
 # 2. Skills (0-15)

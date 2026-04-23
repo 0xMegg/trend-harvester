@@ -41,7 +41,7 @@ claude "Read the project plan in docs/, refer to PlaceholderGuide.md,
 and fill in all {{PLACEHOLDER}}s in the harness.
 Targets: CLAUDE.md, context/about-me.md, context/access-policy.md,
 context/mcp-policy.md, templates/role-*.md
-Also modify .claude/rules/ and .claude/hooks/post-edit-check.sh
+Also modify .claude/rules/local/ (project-specific rules) and .claude/hooks/post-edit-check.sh
 to fit this project."
 ```
 
@@ -129,7 +129,7 @@ until `--apply`. One project at a time — never batch-upgrade.
 ### Committing the sync on a protected branch
 
 If the project's current branch is protected (`main` / `master` / `dev`),
-`.claude/rules/git.md` blocks direct commits via the pre-commit hook.
+`.claude/rules/base/git.md` blocks direct commits via the pre-commit hook.
 Inline bypass with `HARVEST_ALLOW_MAIN=1 git commit ...` does **not** work
 under Claude Code — the PreToolUse hook only sees the Claude Code process's
 environment, so the env var set on the command is invisible. Restarting
@@ -162,7 +162,7 @@ claude "Analyze the code in this project, refer to PlaceholderGuide.md,
 and fill in all {{PLACEHOLDER}}s in the harness.
 Targets: CLAUDE.md, context/about-me.md, context/access-policy.md,
 context/mcp-policy.md, templates/role-*.md
-Also modify .claude/rules/ and .claude/hooks/post-edit-check.sh
+Also modify .claude/rules/local/ (project-specific rules) and .claude/hooks/post-edit-check.sh
 to fit this project.
 Additionally, analyze the project's strengths, areas for improvement,
 and issues that should be fixed immediately, and organize them as a
@@ -201,11 +201,14 @@ project/
 │   │   ├── develop.md                     # /develop: Enter Developer role
 │   │   └── review.md                      # /review: Enter Reviewer role
 │   └── rules/
-│       ├── api.md                         # API/DB rules
-│       ├── frontend.md                    # UI rules
-│       ├── testing.md                     # Testing rules
-│       ├── git.md                         # Commit/branch rules
-│       └── gotchas.md                     # Project-specific pitfalls (separated from CLAUDE.md)
+│       ├── base/                          # Harness-owned rules (upgraded automatically)
+│       │   ├── api.md                     # API/DB rules
+│       │   ├── frontend.md                # UI rules
+│       │   ├── testing.md                 # Testing rules
+│       │   ├── git.md                     # Commit/branch rules
+│       │   └── gotchas.md                 # General pitfalls (separated from CLAUDE.md)
+│       └── local/                         # Project-owned rules (upgrade-safe, never overwritten)
+│           └── README.md                  # Convention guide for local rules
 ├── context/
 │   ├── about-me.md                        # Project background
 │   ├── working-rules.md                   # Working principles + 3-Role + token management + evaluation loop
@@ -287,7 +290,8 @@ CLAUDE.md (AI entry point)
   ├── docs/epic-guide.md <- Epic decomposition criteria, parallel execution guide
   ├── skills/SKILL-TEST-CHECKLIST.md <- Skill quality verification
   ├── .claude/commands/ <- Slash commands (/plan, /develop, /review)
-  ├── .claude/rules/ <- Auto-applied rules
+  ├── .claude/rules/base/ <- Auto-applied harness rules (upgrade-managed)
+  ├── .claude/rules/local/ <- Auto-applied project rules (upgrade-safe)
   ├── .claude/hooks/ <- Automated safety checks
   └── .claude/settings.json <- Permissions + hook connections
 ```
@@ -338,7 +342,7 @@ EPIC COMPLETE
 | `commands/` | 6.1 (Skill triggers), operational principles (reduce repetition cost) |
 | `verify.md` | 5.11 (verification layers), 5.10 ("define how to verify before starting") |
 | `evaluation.md` | 5.11 (evaluation loop 5 metrics) |
-| `rules/` | 5.4 (Rules separation), 5.5 (context engineering) |
+| `rules/base/` + `rules/local/` | 5.4 (Rules separation), 5.5 (context engineering) |
 | `working-rules.md` | 5.5 (token economics), 5.7 (session management) |
 | `context/` | 3.17 (starter bundle), 5.2 (workspace design) |
 | `templates/` | 3.9 (template roles), 4.3 (practical prompts) |
@@ -376,8 +380,8 @@ EPIC COMPLETE
 |-------------|----|----|
 | Post-edit check | All WARNING (exit 0) | **BLOCK/WARN severity separation** -- Secrets and forbidden patterns block with exit 2 |
 | Post-edit test | None (manual execution) | **post-edit-test.sh** -- Auto-run targeted tests for changed areas |
-| CLAUDE.md | ~90 lines (Gotchas, Templates, etc. included) | **Slimmed to ~50 lines** -- Gotchas separated to rules/gotchas.md |
-| Gotchas | Included in CLAUDE.md body | **Separated to rules/gotchas.md** -- Promoted to auto-applied rule |
+| CLAUDE.md | ~90 lines (Gotchas, Templates, etc. included) | **Slimmed to ~50 lines** -- Gotchas separated to rules/base/gotchas.md |
+| Gotchas | Included in CLAUDE.md body | **Separated to rules/base/gotchas.md** (harness-wide) + `rules/local/gotchas-<project>.md` (project-specific, upgrade-safe) |
 | Forbidden patterns | Hardcoded in hooks or absent | **BLOCKED_PATTERNS array** -- Configurable per project |
 
 ### v2 -> v3

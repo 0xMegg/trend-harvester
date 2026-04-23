@@ -135,7 +135,7 @@ After each Slice (Task) is completed, 5 key metrics are recorded using `template
 Success rate, human edit volume, time, tokens/cost, failure types.
 
 At the Epic level, per-Slice evaluations are aggregated to analyze recurring failure patterns.
-If the same type of failure occurs 2+ times, it gets reflected in `rules/gotchas.md` or Skill Gotchas.
+If the same type of failure occurs 2+ times, it gets reflected in `rules/local/gotchas-<project>.md` (project-specific) or `rules/base/gotchas.md` (harness-wide via template PR), or Skill Gotchas.
 
 ### Policy Document References
 

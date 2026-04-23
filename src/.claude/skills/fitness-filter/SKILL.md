@@ -29,7 +29,7 @@ Trend item:
 ## Pre-Filter: Concreteness Gate
 
 Before scoring, reject proposals that lack concrete specifics. A proposal MUST specify all three:
-1. **Target file** — exact path (e.g., `.claude/rules/gotchas.md`, not "a rule file")
+1. **Target file** — exact path. Project-specific pitfall: `.claude/rules/local/gotchas-<project>.md`. Harness-wide rule (needs template PR): `.claude/rules/base/gotchas.md`. Never just "a rule file".
 2. **Triggering condition** — specific, observable event (e.g., "3+ consecutive identical error messages", not "when things go wrong")
 3. **Action** — exact behavior (e.g., "exit 1 to block commit", not "warn the user")
 
@@ -76,7 +76,7 @@ Each axis 0-2 points, 10 points total. **Threshold: 6 points** (meaningfully sat
 
 ## Context Required
 Files that must be read when calculating scores:
-1. `.claude/rules/gotchas.md` — existing pitfalls (for evaluating the Friction axis)
+1. `.claude/rules/base/gotchas.md` + `.claude/rules/local/gotchas-*.md` — existing pitfalls (for evaluating the Friction axis)
 2. `CLAUDE.md` — project architecture (for judging applicability)
 3. `harvest/config.json` — per-axis weights
 4. `context/harvest-policy.md` — whether auto-apply is possible

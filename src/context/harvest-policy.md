@@ -10,8 +10,8 @@ Automatically applied when **all** of the following conditions are met:
 - harness-report score does not decrease (Gate 2 passed)
 
 Auto-apply targets:
-- Adding Known Pitfalls to `.claude/rules/gotchas.md`
-- Adding entries to existing rule files (api.md, frontend.md, testing.md, git.md)
+- Adding Known Pitfalls. **Default target: `.claude/rules/local/gotchas-<project>.md`** (project-specific, upgrade-safe). If the pitfall applies across all downstreams, the harvest proposal should be redirected to `.claude/rules/base/gotchas.md` via a template-repo PR instead.
+- Adding entries to existing rule files. Project-specific additions go under `.claude/rules/local/<topic>-<project>.md`. Changes to `.claude/rules/base/*.md` (api.md, frontend.md, testing.md, git.md) require template PR.
 
 ## Requires Approval (Human Review Needed)
 - change_type: `new-skill` (creating a new skill directory)

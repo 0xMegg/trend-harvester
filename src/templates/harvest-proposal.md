@@ -6,7 +6,7 @@
 - Discovered: [YYYY-MM-DD HH:MM]
 
 ## Concreteness Check
-- Target file: [exact path, e.g., `.claude/rules/gotchas.md`]
+- Target file: [exact path. Project-specific pitfalls → `.claude/rules/local/gotchas-<project>.md`. Cross-project harness-wide rule → `.claude/rules/base/gotchas.md` (requires template repo PR).]
 - Trigger: [specific condition, e.g., "3+ identical errors in output"]
 - Action: [exact behavior, e.g., "exit 1 in pre-commit hook"]
 - Pass/Fail: [pass / fail:abstract-proposal]

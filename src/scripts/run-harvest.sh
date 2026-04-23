@@ -182,7 +182,7 @@ if [ "$MODE" = "full" ]; then
 
   if [ "${item_count:-0}" -gt 0 ]; then
     echo "Analyzing collected items with fitness-filter..."
-    "$CLAUDE_BIN" -p "Read harvest/raw/${RUN_ID}.jsonl. For each item, apply the fitness-filter skill (5-axis scoring). Items scoring >= 6: save to harvest/analyzed/${RUN_ID}-passed.json. Items scoring < 6: save to harvest/rejected/${RUN_ID}-rejected.json with reasons. Read CLAUDE.md, .claude/rules/gotchas.md, and harvest/config.json for context." \
+    "$CLAUDE_BIN" -p "Read harvest/raw/${RUN_ID}.jsonl. For each item, apply the fitness-filter skill (5-axis scoring). Items scoring >= 6: save to harvest/analyzed/${RUN_ID}-passed.json. Items scoring < 6: save to harvest/rejected/${RUN_ID}-rejected.json with reasons. Read CLAUDE.md, .claude/rules/base/gotchas.md, all .claude/rules/local/*.md, and harvest/config.json for context. New pitfalls default to .claude/rules/local/gotchas-<project>.md (upgrade-safe); only escalate to .claude/rules/base/gotchas.md via template PR when truly cross-project." \
       --output-format text \
       > "$HARVEST_DIR/analyzed/${RUN_ID}-analysis.log" 2>&1 || true
     echo -e "${GREEN}✓ Analysis complete${NC}"

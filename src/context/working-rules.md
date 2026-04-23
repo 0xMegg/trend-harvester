@@ -67,7 +67,7 @@ Focus over frugality — compose only what is needed.
 | Always Resident | Open Only When Needed |
 |-----------|---------------|
 | CLAUDE.md | Long reference docs, case studies |
-| Short shared rules (rules/) | Detailed library references |
+| Short shared rules (rules/base/, rules/local/) | Detailed library references |
 | Core commands, project structure | Outdated design docs |
 | handoff/latest.md | outputs/archive/ |
 
@@ -114,7 +114,7 @@ Focus over frugality — compose only what is needed.
 | 파일 | 상한 | 이유 |
 |------|------|------|
 | `CLAUDE.md` | 200줄 | 항상 resident, token 비용 직접 |
-| `.claude/rules/*.md` | 50줄 | 항상 resident, 짧은 운영 문서 |
+| `.claude/rules/{base,local}/*.md` | 50줄 | 항상 resident, 짧은 운영 문서 |
 | `context/*.md` | 150줄 | 자주 참조 (`decision-log.md` 제외) |
 
 초과 시: (1) 분할, (2) 요약, (3) on-demand 이동 중 선택. 한시적 우회는 `HARVEST_ALLOW_OVERSIZE=1`.
@@ -129,7 +129,7 @@ Record an evaluation in the `templates/evaluation.md` format after each task tha
 4. **What goes in it** — the 5 metrics (success rate, human edits, time, tokens, failure types) plus `Lessons Learned` and `What I would do differently`. Auto-filled metadata (files touched, diff size) is populated by the stub.
 
 When recurring failure patterns appear across evaluations:
-1. Add as a Known Pitfall in `.claude/rules/gotchas.md`
+1. Add as a Known Pitfall. Project-specific → `.claude/rules/local/gotchas-<project>.md` (upgrade-safe). Harness-wide → `.claude/rules/base/gotchas.md` (template PR required).
 2. Add to the relevant Skill's Common Pitfalls
 3. Add automatic detection via hooks if necessary
 

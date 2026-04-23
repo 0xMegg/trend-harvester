@@ -81,7 +81,7 @@ Accepts user-provided improvement idea and creates a raw entry:
 
 ### Phase 2: Analysis
 For each collected item, invoke the `fitness-filter` skill:
-1. Load project context (CLAUDE.md, rules/, gotchas.md)
+1. Load project context (CLAUDE.md, rules/base/, rules/local/, gotchas.md)
 2. Calculate 5-axis score
 3. score >= 6 → save to `harvest/analyzed/`
 4. score < 6 → save to `harvest/rejected/` + record reason
@@ -132,7 +132,7 @@ Files that must be read before running the pipeline:
 2. `context/harvest-policy.md` — auto-apply policy
 3. `harvest/baseline.json` — current baseline score
 4. `harvest/.seen.json` — dedup index
-5. `.claude/rules/gotchas.md` — existing pitfalls (for fitness-filter)
+5. `.claude/rules/base/gotchas.md` + `.claude/rules/local/gotchas-*.md` — existing pitfalls (for fitness-filter)
 6. `CLAUDE.md` — project architecture
 
 ## Gotchas

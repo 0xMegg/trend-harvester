@@ -40,7 +40,8 @@ fi
 # Create directory structure
 echo "[1/7] Creating directory structure..."
 mkdir -p "$TARGET_DIR/.claude/hooks"
-mkdir -p "$TARGET_DIR/.claude/rules"
+mkdir -p "$TARGET_DIR/.claude/rules/base"
+mkdir -p "$TARGET_DIR/.claude/rules/local"
 mkdir -p "$TARGET_DIR/context"
 mkdir -p "$TARGET_DIR/templates"
 mkdir -p "$TARGET_DIR/outputs/plans"
@@ -90,9 +91,12 @@ echo "[3/7] Setting up hooks..."
 cp "$TEMPLATE_DIR/.claude/hooks/"*.sh "$TARGET_DIR/.claude/hooks/"
 chmod +x "$TARGET_DIR/.claude/hooks/"*.sh
 
-# Copy rules
+# Copy rules — base/ owned by harness (template copies), local/ seeded once
 echo "[4/7] Copying rules..."
-cp "$TEMPLATE_DIR/.claude/rules/"*.md "$TARGET_DIR/.claude/rules/"
+cp "$TEMPLATE_DIR/.claude/rules/base/"*.md "$TARGET_DIR/.claude/rules/base/"
+if [ -f "$TEMPLATE_DIR/.claude/rules/local/README.md" ] && [ ! -f "$TARGET_DIR/.claude/rules/local/README.md" ]; then
+  cp "$TEMPLATE_DIR/.claude/rules/local/README.md" "$TARGET_DIR/.claude/rules/local/"
+fi
 
 # Copy custom commands
 echo "[5/7] Copying custom commands..."
@@ -223,7 +227,7 @@ echo ""
 echo "     claude \"Read the project plan in docs/ and fill all {{PLACEHOLDER}} values"
 echo "     using PlaceholderGuide.md as reference."
 echo "     Target files: CLAUDE.md, context/about-me.md, templates/role-*.md"
-echo "     Also customize .claude/rules/, .claude/hooks/post-edit-check.sh,"
+echo "     Also customize .claude/rules/local/ (project-specific), .claude/hooks/post-edit-check.sh,"
 echo "     and .claude/hooks/post-edit-test.sh for this project.\""
 echo ""
 echo "  3. Start development (use slash commands):"

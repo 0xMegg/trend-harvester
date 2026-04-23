@@ -37,8 +37,8 @@ Phase 3.5: Autoresearch Judge
 
 Phase 4: Apply
   Auto-applied: 2
-    .claude/rules/gotchas.md → "Flutter pubspec version conflict" pitfall added
-    .claude/rules/testing.md → "shellcheck for bash scripts" rule added
+    .claude/rules/local/gotchas-<project>.md → "Flutter pubspec version conflict" pitfall added (project-specific)
+    .claude/rules/base/testing.md → "shellcheck for bash scripts" rule added (harness-wide, requires template PR)
   Pending approval: 1
     .claude/hooks/pre-commit-shellcheck.sh → hook change (requires approval)
   Rejected: 4

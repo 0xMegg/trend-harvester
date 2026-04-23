@@ -97,8 +97,6 @@ This workspace coordinates multiple independent repositories:
 - Tasks modifying 3+ files → Planner must produce a plan first
 
 ## Rules (auto-applied)
-- `.claude/rules/api.md` — API/DB rules
-- `.claude/rules/frontend.md` — UI rules
-- `.claude/rules/testing.md` — testing rules
-- `.claude/rules/git.md` — commit and branch rules
-- `.claude/rules/gotchas.md` — project-specific pitfalls
+- `.claude/rules/base/*.md` — harness-owned rules (api, frontend, testing, git, gotchas). Upgraded automatically by `upgrade-harness.sh`.
+- `.claude/rules/local/*.md` — project-specific rules (upgrade-safe; never overwritten). Add project learnings here (e.g., `gotchas-<project>.md`).
+Claude reads both directories on every session.

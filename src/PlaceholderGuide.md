@@ -94,7 +94,7 @@ These commands are used for automatic verification after every code change.
 
 ---
 
-## 3. .claude/rules/gotchas.md — Project Pitfalls
+## 3. .claude/rules/base/gotchas.md — Project Pitfalls
 
 | Placeholder | Description | Examples |
 |-------------|-------------|----------|
@@ -102,7 +102,7 @@ These commands are used for automatic verification after every code change.
 | `{{GOTCHA_2}}` | Pitfall 2 | `iOS simulator needs manual cert refresh after 7 days` |
 | `{{GOTCHA_3}}` | Pitfall 3 | `Legacy code in lib/screens/ uses different patterns` |
 
-> Add or remove lines as needed. These accumulate over time — each bug fix or unexpected behavior is a candidate. Moved from CLAUDE.md to rules/ so it's auto-applied without bloating the contract.
+> Add or remove lines as needed. These accumulate over time — each bug fix or unexpected behavior is a candidate. Moved from CLAUDE.md to rules/base/ so it's auto-applied without bloating the contract. Project-specific gotchas discovered mid-flight should go in `rules/local/gotchas-<project>.md` to survive harness upgrades.
 
 ---
 

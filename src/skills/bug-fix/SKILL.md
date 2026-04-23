@@ -50,7 +50,7 @@ Fix the bug with minimal blast radius and full verification.
 - [ ] `{{LINT_CMD}}` passes with no warnings
 - [ ] Related tests pass
 - [ ] Regression test added
-- [ ] Project architecture rules followed (see .claude/rules/)
+- [ ] Project architecture rules followed (see .claude/rules/base/ and .claude/rules/local/)
 - [ ] Manual reproduction no longer triggers the bug
 - [ ] {{VERIFY_CHECK_1}}
 - [ ] {{VERIFY_CHECK_2}}
