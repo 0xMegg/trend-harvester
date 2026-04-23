@@ -1,3 +1,62 @@
+# Handoff — 2026-04-23 PM-5 (kody E10/P1-4 — post-task handoff gate)
+
+## What Changed (PM-5)
+kody 가 보낸 E10 addendum(`c54830a` / merged in `7f929c6`) — "APPROVE 이후 같은 세션의 tail 작업이 handoff 에 반영 안 돼 다음 세션이 stale 진입" 설계 gap. P1-4 조합 제안대로 **role template 보강 + SessionEnd 훅** 으로 처리.
+
+### Src 편집 (3개)
+- `src/.claude/hooks/handoff-freshness-check.sh` (신규) — SessionEnd 훅. HEAD 커밋 시각이 handoff/latest.md mtime + 60s 보다 크면 경고. 비차단(exit 0). macOS/Linux stat 양쪽 지원
+- `src/.claude/settings.json` — SessionEnd 블록에 훅 등록
+- `src/templates/role-reviewer.md` — "## Post-task Activities" 섹션 추가. `## Post-task activities` 서브섹션에 append 하는 convention + SessionEnd 훅 언급
+
+### 검증
+- `bash -n` + `shellcheck` clean
+- `/tmp/hook-test` smoke: handoff 최신 → quiet, handoff 오래됨 (`touch -t 202504230800`) → 경고 출력 + exit 0
+- `python3 -c "import json; json.load(...)"` — settings.json 여전히 valid
+
+### Build/Commit
+- forge `2a2a51a` — P1-4 구현
+- template `196f10d` — 4 파일 sync (신규 hook + settings + role-reviewer + stamp). 둘 다 미푸시
+
+## ⚠ 다운스트림 전파 주의 (중요)
+**`.claude/settings.json` 은 `.harness-manifest` [seed] 라 upgrade-harness.sh 가 덮어쓰지 않음**. 따라서:
+- 훅 파일(`.claude/hooks/handoff-freshness-check.sh`) → [managed] 로 자동 배포됨 ✅
+- SessionEnd 등록(settings.json) → **수동 추가 필요** ❌
+
+각 다운스트림(divebase/kody) 에서 `upgrade-harness.sh --apply` 후 `.claude/settings.json` 의 `hooks` 블록에 아래 항목 수동 append:
+```json
+"SessionEnd": [
+  {
+    "hooks": [
+      {
+        "type": "command",
+        "command": ".claude/hooks/handoff-freshness-check.sh"
+      }
+    ]
+  }
+]
+```
+
+장기적으로는 manifest 정책을 재검토하거나 upgrade-harness.sh 가 이런 seed-hook 충돌을 감지해 메시지 출력하는 게 맞음. 이번 Task 범위 밖.
+
+## Post-task activities (dogfood)
+이번 PM-5 세션에서 P1-4 convention 을 스스로 시범 적용.
+
+- (이 섹션 자체가 dogfood — PM-4 까지는 "Post-task activities" 섹션 없었음)
+- 다음 세션 진입 시 이 섹션이 있으면 P1-4 이후 세션, 없으면 그 이전 세션으로 식별 가능
+
+## 미해결 carry-over (PM-4 → PM-5)
+- **divebase**: `c4076d3 chore: harness sync — forge b7bbd19` 로컬에 있음, **미푸시**. main 브랜치
+- **kody-workspace**: `upgrade-harness.sh --apply` 보류 중. `.claude/rules/gotchas.md` 와 `frontend.md` 에 kody 로컬 커스텀(Epic 7 F-01/F-02 학습, "Theme-Aware Styling (kody OMS 3-variant)" 섹션) 있어 덮어쓰면 손실. 진행 전 preserve 절차(백업 → apply → append) 결정 필요
+- **forge/template**: PM-5 커밋 2건(`2a2a51a`, `196f10d`) 둘 다 미푸시
+
+## Current State (PM-5 종료 시점)
+- **forge HEAD**: `2a2a51a` (1 ahead of origin, unpushed)
+- **template HEAD**: `196f10d` (6 ahead of origin, unpushed)
+- **divebase HEAD**: `c4076d3` (1 ahead of origin, unpushed)
+- **kody HEAD**: 변경 없음 (dev 브랜치, 동기화 보류)
+
+---
+
 # Handoff — 2026-04-23 PM-4 (kody Report 2 P0-5 누락 뒤처리)
 
 ## What Changed (PM-4)
