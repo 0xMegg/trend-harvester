@@ -25,7 +25,6 @@
 .claude/skills/harness-report/**
 .claude/skills/trend-harvest/**
 .claude/.harness-version
-.claude/.harness-origin
 
 # Top-level skills library (harness-provided workflows)
 skills/**
@@ -67,6 +66,10 @@ DRYRUN-NOTES.md
 
 # Claude config users edit per-project
 .claude/settings.json
+
+# Per-project template-repo pointer — seed once, project owns it after
+# (each project may have a different TEMPLATE_REPO path)
+.claude/.harness-origin
 
 # User-added skills under .claude/skills/ — the 3 managed above are
 # owned by the harness; any others are project-local.

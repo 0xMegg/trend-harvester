@@ -49,21 +49,26 @@ case "${1:-}" in
 esac
 
 # ---------- Locate project + template ----------
+# TEMPLATE_REPO resolution order:
+#   1. pre-set env var (one-off propagation, broken .harness-origin bypass)
+#   2. .claude/.harness-origin in the project (seed-owned; each project
+#      customizes its path)
 PROJECT_DIR="$(pwd)"
 ORIGIN_FILE="$PROJECT_DIR/.claude/.harness-origin"
 
-if [ ! -f "$ORIGIN_FILE" ]; then
-  echo "${RED}ERROR: .claude/.harness-origin not found in $PROJECT_DIR${NC}" >&2
-  echo "  Run setup.sh from the template, or create .claude/.harness-origin with TEMPLATE_REPO=<path>" >&2
-  exit 1
+if [ -z "${TEMPLATE_REPO:-}" ]; then
+  if [ ! -f "$ORIGIN_FILE" ]; then
+    echo "${RED}ERROR: .claude/.harness-origin not found and TEMPLATE_REPO env var not set${NC}" >&2
+    echo "  Either:  (a) run setup.sh from the template, or" >&2
+    echo "           (b) invoke with:  TEMPLATE_REPO=/path/to/template bash $0" >&2
+    exit 1
+  fi
+  # shellcheck source=/dev/null
+  source "$ORIGIN_FILE"
 fi
 
-TEMPLATE_REPO=""
-# shellcheck source=/dev/null
-source "$ORIGIN_FILE"
-
 if [ -z "${TEMPLATE_REPO:-}" ]; then
-  echo "${RED}ERROR: TEMPLATE_REPO not set in $ORIGIN_FILE${NC}" >&2
+  echo "${RED}ERROR: TEMPLATE_REPO unresolved (not in env and not in $ORIGIN_FILE)${NC}" >&2
   exit 1
 fi
 
