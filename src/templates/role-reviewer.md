@@ -150,3 +150,19 @@ Single-repo workspace (`.git/` at root): commit at root as usual.
 ## Handoff
 Overwrite handoff/latest.md using `templates/handoff.md` format. Fill all fields including Reviewer-only sections (Verdict, Commit, Issues Found).
 Set Phase to "Review → [APPROVE / REQUEST_CHANGES / ITERATE]".
+
+## Post-task Activities
+APPROVE does not end handoff's responsibility. If additional work happens in
+the same session after APPROVE — PR merge, branch cleanup, propagation to
+another repo, upstream feedback delivery, env/config tweaks — append each
+activity to `handoff/latest.md` under a dedicated `## Post-task activities`
+section (create if missing). One short line per activity, include commit
+hashes or PR links when available.
+
+Rationale: handoff has two roles — task-phase artifact AND next-session
+entry point. Without this append, the next session reads a stale snapshot
+(APPROVE moment) and may redo completed work.
+
+The SessionEnd hook `.claude/hooks/handoff-freshness-check.sh` warns when
+HEAD commit time is newer than the handoff mtime. Treat that warning as a
+reminder to apply this convention before closing the session.
