@@ -1,3 +1,80 @@
+# Handoff — 2026-04-24 PM-9 (Phase 2 — auto-apply)
+
+## What Changed (PM-9)
+A/B/C 계획의 C 단계 완료. `check_harness_version()` 을 경고-only 에서 **pending 목록 출력 + 자동 apply** 로 대체.
+
+### 구조
+- `src/scripts/run-task.sh` + `run-epic.sh` `check_harness_version()`:
+  - **버그 수정**: 이전 코드가 local forge hash 를 template repo 의 자기 hash 와 비교 (항상 mismatch 였던 pre-existing 버그). forge ↔ forge 비교로 변경 (template 의 tracked `.claude/.harness-version` 에서 FORGE_COMMIT 추출)
+  - `_extract_forge_commit()` 헬퍼 — 인용 포함 방어
+  - `_summarize_pending_updates()` 헬퍼 — template 의 INDEX.md 테이블 파싱, local commit 기준 이후 row 들만 추출
+  - stale 감지 시: pending 출력 → `upgrade-harness.sh --apply` 자동 호출 → 실패 시 return 1 (task 진입 차단)
+  - `HARVEST_SKIP_UPDATE_CHECK=1` escape hatch
+
+### 실전 검증 (로컬 /tmp/p2-ds 테스트 프로젝트)
+Phase 2 code + FORGE_COMMIT=5fdf9ff stamp 로 시작 → `/task --dry-run` 실행:
+```
+  Harness: v4.0.0 (forge 5fdf9ff, ...)
+  ⚠ Harness out of date: forge 5fdf9ff → d78bdcb
+  Pending updates:
+    [P1] check_harness_version auto-apply (Phase 2) (4d02f86)
+    [P2] harness updates changelog system (Phase 1) (8f2cea7)
+    [P0] write_status() multiline value corruption (657575d)
+  Auto-applying harness updates...
+  (... upgrade-harness.sh --apply 출력)
+  ✓ Harness updated to forge d78bdcb
+  (... PLAN phase 정상 진입)
+```
+2회차: `✓ Harness up-to-date (forge d78bdcb)` → no-op
+Escape hatch: `HARVEST_SKIP_UPDATE_CHECK=1` → apply skip, stamp 그대로, task 그대로 진행
+
+### Forge 커밋
+- `4d02f86` feat: check_harness_version auto-apply (Phase 2)
+- `d78bdcb` docs: update doc for Phase 2 (self-reference chicken-and-egg 회피)
+
+### Template 커밋
+- `20872a6` chore: template update — Phase 2 auto-apply
+
+### Push 완료
+- forge main: `71783c3 → d78bdcb`
+- template main: `27faa62 → 20872a6`
+
+## 다운스트림 bootstrap 안내 (중요)
+
+divebase/kody 의 현재 run-task.sh 는 **Pre-Phase-2** — 다음 `/task` 실행 시 기존 "경고만" 동작 그대로 나옴. 사용자가 **1회 수동 `bash scripts/upgrade-harness.sh --apply`** 를 해야 Phase 2 code 가 설치됨. 그 이후부터 자동 적용.
+
+실전 흐름:
+1. 사용자가 divebase 에서 `/task "<something>"` 실행
+2. 현재(Pre-Phase-2) run-task.sh → "out of date, run upgrade-harness.sh --apply" 경고
+3. 사용자 수동으로 `bash scripts/upgrade-harness.sh --apply` 한 번
+4. 이제 Phase 2 code 설치됨 + d78bdcb 로 동기
+5. 다음 `/task` 부터는 auto-apply 가 자동 반응
+
+또는 사용자가 수동 선제:
+```bash
+cd <divebase 또는 kody>
+bash scripts/upgrade-harness.sh --apply
+# 완료 후 /task 실행 시 이미 최신
+```
+
+## A/B/C 완료 상태
+
+| 단계 | 완료 증거 |
+|---|---|
+| A | 4 repos push 동기, divebase/kody stale 로 보존 (Phase 2 테스트 케이스) ✅ |
+| B | `src/docs/updates/` 시스템 (README + INDEX + 5 retroactive) + template 반영 + push ✅ |
+| C | check_harness_version auto-apply + /tmp 실전 검증 + push ✅ |
+
+## Current State (PM-9 종료 시점)
+- **forge HEAD**: `d78bdcb` (origin/main 동기)
+- **template HEAD**: `20872a6` (origin/main 동기)
+- **divebase main**: `8fd4744` (origin/main 동기, Pre-Phase-2, 1회 수동 apply 대기)
+- **kody dev**: `c991658` (origin/dev 동기, Pre-Phase-2, 1회 수동 apply 대기)
+
+사용자 실무 복귀 준비 완료. 다음 divebase/kody `/task` 또는 수동 apply 로 Phase 2 bootstrap.
+
+---
+
 # Handoff — 2026-04-23 PM-8 (Phase 1 — docs/updates/ changelog system)
 
 ## What Changed (PM-8)
