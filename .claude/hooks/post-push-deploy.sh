@@ -7,6 +7,15 @@
 
 set -euo pipefail
 
+# DEBUG: temporary diagnostic — remove after diagnosing $TOOL_INPUT placeholder issue
+{
+  echo "==== $(date -u +%FT%TZ) ===="
+  echo "argv: [$*]"
+  echo "argc: $#"
+  echo "stdin-peek: $(timeout 1 cat 2>/dev/null || echo '(empty/timeout)')"
+  echo "env-CLAUDE: $(env | grep -E '^(CLAUDE|HOOK|TOOL)' || echo '(none)')"
+} >> /tmp/post-push-deploy.log 2>&1
+
 TOOL_INPUT="${1:-}"
 PROJECT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 
