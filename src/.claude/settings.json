@@ -6,6 +6,7 @@
       "Grep",
       "Write",
       "Edit",
+      "Bash(bash .claude/scripts/check-task-status.sh:*)",
       "Bash(git commit *)",
       "Bash(git add *)",
       "Bash(git push)",

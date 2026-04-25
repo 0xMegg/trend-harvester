@@ -102,6 +102,7 @@ fi
 MANAGED=()
 SEED=()
 IGNORE=()
+DEPRECATED=()
 section=""
 while IFS= read -r line || [ -n "$line" ]; do
   # Trim trailing + leading whitespace (tabs and spaces)
@@ -110,17 +111,40 @@ while IFS= read -r line || [ -n "$line" ]; do
   [ -z "$line" ] && continue
   case "$line" in
     \#*) continue ;;
-    \[managed\]) section="managed"; continue ;;
-    \[seed\])    section="seed";    continue ;;
-    \[ignore\])  section="ignore";  continue ;;
-    \[*)         section="";        continue ;;
+    \[managed\])    section="managed";    continue ;;
+    \[seed\])       section="seed";       continue ;;
+    \[ignore\])     section="ignore";     continue ;;
+    \[deprecated\]) section="deprecated"; continue ;;
+    \[*)            section="";           continue ;;
   esac
   case "$section" in
-    managed) MANAGED+=("$line") ;;
-    seed)    SEED+=("$line")    ;;
-    ignore)  IGNORE+=("$line")  ;;
+    managed)    MANAGED+=("$line") ;;
+    seed)       SEED+=("$line")    ;;
+    ignore)     IGNORE+=("$line")  ;;
+    deprecated) DEPRECATED+=("$line") ;;
   esac
 done < "$MANIFEST"
+
+# ---------- Resolve PROJECT_NAME for placeholder substitution ----------
+# Order: env var → CLAUDE.md "- Name:" line → directory basename.
+# Used to substitute {{PROJECT_NAME}} in managed .md/.sh files post-copy
+# (covers files that setup.sh's FILES_TO_REPLACE list missed at init time).
+resolve_project_name() {
+  if [ -n "${PROJECT_NAME:-}" ]; then
+    echo "$PROJECT_NAME"
+    return
+  fi
+  if [ -f "$PROJECT_DIR/CLAUDE.md" ]; then
+    local n
+    n="$(awk '/^- Name:/ { sub(/^- Name:[[:space:]]*/, ""); print; exit }' "$PROJECT_DIR/CLAUDE.md")"
+    if [ -n "$n" ] && [ "$n" != "{{PROJECT_NAME}}" ]; then
+      echo "$n"
+      return
+    fi
+  fi
+  basename "$PROJECT_DIR"
+}
+PROJECT_NAME_RESOLVED="$(resolve_project_name)"
 
 # ---------- Classification ----------
 # Returns 0 if $1 matches pattern $2; handles `dir/**` as recursive prefix.
@@ -161,6 +185,8 @@ ACT_SEED_INSTALL=()     # seed file, project missing it
 ACT_SEED_SKIP=()        # seed file, project already has it
 ACT_IGNORE=()           # template file classified as ignore (rare)
 ACT_UNKNOWN=()          # template file not matched by any section
+ACT_DEPRECATED_DEL=()   # deprecated path present in project — will be deleted
+ACT_DEPRECATED_GONE=()  # deprecated path already absent — silent skip
 
 while IFS= read -r -d '' file; do
   rel="${file#"$TEMPLATE_REPO"/}"
@@ -185,6 +211,18 @@ while IFS= read -r -d '' file; do
       if $APPLY; then
         mkdir -p "$(dirname "$dst")"
         cp -p "$file" "$dst"
+        # Post-copy: substitute {{PROJECT_NAME}} in managed text files so
+        # downstream projects do not ship raw placeholders (root cause of
+        # the divebase task.md regression where the inline command pointed
+        # at /tmp/{{PROJECT_NAME}}-run/).
+        case "$rel" in
+          *.md|*.sh)
+            if grep -q '{{PROJECT_NAME}}' "$dst" 2>/dev/null; then
+              sed -i '' "s/{{PROJECT_NAME}}/$PROJECT_NAME_RESOLVED/g" "$dst" 2>/dev/null || \
+              sed -i "s/{{PROJECT_NAME}}/$PROJECT_NAME_RESOLVED/g" "$dst" 2>/dev/null || true
+            fi
+            ;;
+        esac
       fi
       ;;
     seed)
@@ -202,6 +240,22 @@ while IFS= read -r -d '' file; do
     unknown) ACT_UNKNOWN+=("$rel") ;;
   esac
 done < <(find "$TEMPLATE_REPO" -type f -print0)
+
+# ---------- Process [deprecated] removals ----------
+# Iterates manifest [deprecated] entries against the project (no template
+# walk — these are paths the harness no longer ships). Existing files are
+# deleted on --apply; absent files are silent (re-running upgrade stays
+# idempotent after a successful cleanup).
+for dpath in ${DEPRECATED[@]+"${DEPRECATED[@]}"}; do
+  if [ -e "$PROJECT_DIR/$dpath" ]; then
+    ACT_DEPRECATED_DEL+=("$dpath")
+    if $APPLY; then
+      rm -f "$PROJECT_DIR/$dpath"
+    fi
+  else
+    ACT_DEPRECATED_GONE+=("$dpath")
+  fi
+done
 
 # Ensure managed scripts/hooks remain executable after copy
 if $APPLY; then
@@ -237,6 +291,10 @@ echo
 echo "${CYAN}Seed — install (missing)   : ${#ACT_SEED_INSTALL[@]}${NC}"
 print_list "+" ${ACT_SEED_INSTALL[@]+"${ACT_SEED_INSTALL[@]}"}
 echo "${GREEN}Seed — skip (exists)       : ${#ACT_SEED_SKIP[@]}${NC}"
+echo
+echo "${YELLOW}Deprecated — delete        : ${#ACT_DEPRECATED_DEL[@]}${NC}"
+print_list "-" ${ACT_DEPRECATED_DEL[@]+"${ACT_DEPRECATED_DEL[@]}"}
+echo "${GREEN}Deprecated — already gone  : ${#ACT_DEPRECATED_GONE[@]}${NC}"
 echo
 
 if [ ${#ACT_UNKNOWN[@]} -gt 0 ]; then

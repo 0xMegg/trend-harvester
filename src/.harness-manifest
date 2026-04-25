@@ -4,9 +4,12 @@
 # Consumed by scripts/upgrade-harness.sh to decide what to copy where.
 #
 # Sections (first-match-wins, in order: managed → seed → ignore):
-#   [managed]  harness owns this file — upgrade overwrites the project copy
-#   [seed]     harness seeds this file once — upgrade skips if destination exists
-#   [ignore]   project-local state — upgrade never touches
+#   [managed]    harness owns this file — upgrade overwrites the project copy
+#   [seed]       harness seeds this file once — upgrade skips if destination exists
+#   [ignore]     project-local state — upgrade never touches
+#   [deprecated] paths the harness used to ship — upgrade deletes them from
+#                projects (silent skip if already gone). Use when files are
+#                renamed/relocated so downstream copies do not orphan.
 #
 # Template files that match no section are reported as coverage gaps.
 #
@@ -20,6 +23,7 @@
 # Core agent config — owned by harness
 .claude/commands/**
 .claude/hooks/**
+.claude/scripts/**
 .claude/rules/base/**
 .claude/skills/fitness-filter/**
 .claude/skills/harness-report/**
@@ -114,3 +118,13 @@ outputs/**
 .env.*
 node_modules/**
 .DS_Store
+
+[deprecated]
+# Old root-level rules superseded by .claude/rules/base/** (commit 1192226).
+# Downstream projects that synced before the split keep these orphan files;
+# upgrade-harness.sh deletes them so base/local layout stays clean.
+.claude/rules/api.md
+.claude/rules/frontend.md
+.claude/rules/git.md
+.claude/rules/gotchas.md
+.claude/rules/testing.md

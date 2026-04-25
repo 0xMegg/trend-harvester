@@ -10,6 +10,7 @@ forge src/ 에서 다운스트림으로 전파되는 모든 변경의 연대기.
 
 | Date | Hash | Severity | Type | Title | Breaking |
 |------|------|----------|------|-------|----------|
+| 2026-04-25 | [PENDING](./PENDING-forge-feedback-2026-04-25.md) | P0 | fix | divebase forge-feedback 5건 (monitoring prompt 폭주 / placeholder 치환 / 옛 root rules 정리) | no |
 | 2026-04-25 | [bcb8cf9](./bcb8cf9.md) | P0 | fix | bash3 compat + develop-noop guard + install-before-import rule | no |
 | 2026-04-24 | [4d02f86](./4d02f86.md) | P1 | feat | check_harness_version auto-apply (Phase 2) | no |
 | 2026-04-23 | [8f2cea7](./8f2cea7.md) | P2 | docs | harness updates changelog system (Phase 1) | no |

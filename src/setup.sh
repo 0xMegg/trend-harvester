@@ -165,7 +165,21 @@ FILES_TO_REPLACE=(
   "$TARGET_DIR/templates/role-reviewer.md"
   "$TARGET_DIR/scripts/run-task.sh"
   "$TARGET_DIR/scripts/run-epic.sh"
+  "$TARGET_DIR/.claude/commands/task.md"
 )
+
+# Auto-discover any other [managed] .md/.sh files containing the placeholder.
+# Belt-and-braces: explicit list above documents intent; this loop catches
+# files added later without forcing setup.sh edits.
+while IFS= read -r -d '' f; do
+  case " ${FILES_TO_REPLACE[*]} " in
+    *" $f "*) ;;
+    *) FILES_TO_REPLACE+=("$f") ;;
+  esac
+done < <(grep -rlZ '{{PROJECT_NAME}}' \
+            "$TARGET_DIR/.claude/commands" \
+            "$TARGET_DIR/.claude/scripts" \
+            2>/dev/null || true)
 
 for file in "${FILES_TO_REPLACE[@]}"; do
   if [ -f "$file" ]; then

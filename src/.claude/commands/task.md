@@ -16,7 +16,7 @@ Run the following command as a **background task** using `run_in_background: tru
 Tell the user the task is running, then **monitor progress every 60 seconds** with a single status check command:
 
 ```bash
-f=/tmp/{{PROJECT_NAME}}-run/task-status; if [ -f "$f" ]; then ( . "$f"; e=$(( $(date +%s) - ${START_EPOCH:-$(date +%s)} )); r="${ROLE:-?}"; [ -n "${ITER:-}" ] && [ "${MAX_ITER:-1}" != "1" ] && r="$r(iter ${ITER}/${MAX_ITER})"; printf "⏱ %dm%ds — %s" $((e/60)) $((e%60)) "$r"; [ -n "${VERDICT:-}" ] && printf " [%s]" "$VERDICT"; echo ); else echo "⏱ waiting for task to start..."; fi
+bash .claude/scripts/check-task-status.sh {{PROJECT_NAME}}
 ```
 
 **Rules:**
