@@ -41,6 +41,7 @@ The output (improved harness templates) is stored in a separate repository.
 4. Make the smallest change that completes the task
 5. Update `handoff/latest.md` with what changed and what's next
 6. After modifying src/, run `bash scripts/build-template.sh`
+7. Any commit modifying `src/` (outside `src/docs/updates/`) must include `src/docs/updates/<short-hash>.md` + a new INDEX.md row in the same commit (per `src/docs/updates/README.md`). Enforced by `.claude/hooks/pre-commit-updates-doc-check.sh`.
 
 ## Restrictions
 - Never commit secrets, API keys, or .env files
