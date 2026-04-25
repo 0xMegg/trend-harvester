@@ -64,6 +64,34 @@ This mirrors the spirit of the **Follow-up Call-Sites** rule above: when
 you add a new symbol or import, the matching obligation lands in the same
 slice, not "in a follow-up Task".
 
+## Empirical-First Deviation
+If you find yourself weakening, removing, or otherwise contradicting an
+invariant the Plan explicitly specified, you MUST attach reproducible
+empirical evidence to the handoff before you ship the deviation:
+
+1. **Test the invariant under the plan's design.** Write the smallest
+   possible reproduction (a SQL block, a `curl` line, a unit test) that
+   exercises the contested behaviour against the system as the plan
+   specified it.
+2. **Capture the actual output.** Full stdout/stderr or HTTP response,
+   not a paraphrase. Include the date and the command line.
+3. **State the conclusion.** "The plan's design [holds / does not hold]
+   because <observed behaviour> contradicts the prediction <stated
+   prediction>."
+4. **If the deviation is justified by observed behaviour**, link the
+   evidence in the handoff under `## Plan deviations` with a section
+   title `<file:line> — <invariant>`.
+
+Reasoning alone — "I think Postgres does X" / "I'm pretty sure TypeScript
+handles Y" — is NOT a basis for weakening a plan invariant. The Reviewer's
+first move on a noticed deviation will be to run the exact test you should
+have run yourself; if no evidence is in the handoff, expect REQUEST_CHANGES
+with the empirical disagreement attached.
+
+This rule especially applies to: RLS / RBAC policies, security constraints,
+build-time guards (e.g. `import "server-only"`), database constraints, and
+anything labelled "defense-in-depth" in the plan.
+
 ## Long-Running Process Hygiene
 Dev servers, file watchers, tunnels, and similar long-lived processes used
 for UI/API verification MUST be:

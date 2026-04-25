@@ -884,6 +884,50 @@ commit_stage() {
     return 0
   fi
 
+  # Verdict cross-check (defense-in-depth) — grep every slice's review file
+  # for the human-facing FINAL_VERDICT marker. The earlier task-status gate
+  # checks VERDICT= but that field can drift from the review file (observed:
+  # honbabseoul Epic 2 Slice 1, where REQUEST_CHANGES in the review went
+  # unnoticed). Fail closed: if any review file is missing, unreadable, or
+  # does not carry the APPROVE marker, abort the stage commit.
+  local _vc_missing=()
+  local _vc_not_approved=()
+  for _vc_idx in "${indices[@]}"; do
+    local _vc_desc="${SLICES[$_vc_idx]}"
+    local _vc_num
+    _vc_num=$(echo "$_vc_desc" | grep -oE "[Tt]ask[[:space:]]+[0-9]+" | grep -oE "[0-9]+" | head -1)
+    if [ -z "$_vc_num" ]; then
+      _vc_num=$(echo "$_vc_desc" | grep -oE "[Ss]lice[[:space:]]+[0-9]+(\.[0-9]+)?" | grep -oE "[0-9]+(\.[0-9]+)?" | head -1)
+    fi
+    local _vc_review=""
+    if [ -n "$_vc_num" ]; then
+      for _vc_cand in \
+        "$PROJECT_DIR/outputs/reviews/task-${_vc_num}-review.md" \
+        "$PROJECT_DIR/outputs/reviews/task-slice-${_vc_num}-review.md" \
+        "$PROJECT_DIR/outputs/reviews/slice-${_vc_num}-review.md"; do
+        if [ -f "$_vc_cand" ]; then _vc_review="$_vc_cand"; break; fi
+      done
+    fi
+    if [ -z "$_vc_review" ]; then
+      _vc_missing+=("Slice $((_vc_idx+1)) (${_vc_desc}) — no review file found under outputs/reviews/")
+      continue
+    fi
+    if ! grep -q '<!-- FINAL_VERDICT: APPROVE -->' "$_vc_review" 2>/dev/null; then
+      local _vc_marker
+      _vc_marker=$(grep -oE '<!-- FINAL_VERDICT: [A-Z_]+ -->' "$_vc_review" 2>/dev/null | tail -1)
+      _vc_marker="${_vc_marker:-<no marker>}"
+      _vc_not_approved+=("$(basename "$_vc_review") — ${_vc_marker}")
+    fi
+  done
+  if [ "${#_vc_missing[@]}" -gt 0 ] || [ "${#_vc_not_approved[@]}" -gt 0 ]; then
+    echo -e "${RED}✗ Verdict cross-check failed for Stage $stage_num — refusing to commit${NC}" >&2
+    for _vc_msg in "${_vc_missing[@]}";      do echo -e "  ${RED}missing:${NC}      $_vc_msg" >&2; done
+    for _vc_msg in "${_vc_not_approved[@]}"; do echo -e "  ${RED}not APPROVE:${NC}  $_vc_msg" >&2; done
+    echo -e "  ${YELLOW}Resolve every slice to FINAL_VERDICT: APPROVE before retrying.${NC}" >&2
+    return 1
+  fi
+  unset _vc_missing _vc_not_approved _vc_idx _vc_desc _vc_num _vc_review _vc_cand _vc_marker _vc_msg
+
   echo -e "${BLUE}Committing Stage $stage_num changes...${NC}"
 
   # Build slice summaries for commit message

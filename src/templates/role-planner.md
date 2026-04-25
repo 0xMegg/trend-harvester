@@ -18,6 +18,7 @@ Before finalizing slice Files lists, run these greps and reflect the results in 
 - **Introducing a new prop / flag / public export**: `grep -rl "<name>" <src_roots>/` — enumerate every call-site. Result files must appear in slice Files lists (same Stage if they only read the new API, or a later Stage if they set it). An API added without at least one call-site is dead code; the Reviewer gate blocks it.
 - **Literal → token/design-system migration**: grep the literal patterns you are replacing (e.g. `textTransform`, `box-shadow`, hardcoded colors or spacings) and cover every hit in the plan. Partial migrations leave cascading-but-bypassed styles that acceptance tests miss.
 - **Shared/core change**: grep for the modified symbol and assign dependent feature files to a later Stage than the core change.
+- **Spec invariant grep**: For every numbered list, table, or enumeration in the spec doc that the slice claims to implement (e.g. "spec §5 lists 6 required fields"), copy the enumeration verbatim into a `## Implements (vs spec)` subsection of the slice plan and pair each row with the matching plan output (column / field / file / endpoint). If the count or names do not match 1:1, either revise the plan or document the omission as an explicit deferral — never let plan and spec silently disagree.
 
 Result files must land either in the same Stage (parallel-safe — no file overlap) or in a later Stage (sequential). Never introduce a new symbol without enumerating its users in the same plan.
 
