@@ -13,12 +13,6 @@ set -euo pipefail
 INPUT_JSON="$(cat 2>/dev/null || true)"
 [ -z "$INPUT_JSON" ] && INPUT_JSON="${1:-}"
 
-# DEBUG: keep one more cycle to confirm fix; remove in a follow-up commit.
-{
-  echo "==== $(date -u +%FT%TZ) ===="
-  echo "input-len: ${#INPUT_JSON}"
-} >> /tmp/post-push-deploy.log 2>&1
-
 # Extract tool_input.command (prefer jq for correctness with multi-line commands).
 if command -v jq >/dev/null 2>&1; then
   CMD=$(printf '%s' "$INPUT_JSON" | jq -r '.tool_input.command // ""' 2>/dev/null || echo "")

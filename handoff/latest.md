@@ -1,3 +1,36 @@
+# Handoff — 2026-04-25 (post-bcb8cf9 marathon)
+
+## 2026-04-25 세션 요약 (forge `bcb8cf9` → `6efaa24`)
+
+honbabseoul Epic 1 회고로 시작된 patch 1건이 forge 결함 3개 보강으로 확장됨.
+
+1. **`bcb8cf9`** — bash3 compat + develop-noop guard + install-before-import
+   (honbabseoul cwd 에서 작성된 후 forge 세션이 빌드/검증/푸시 마무리)
+2. **`892b01e`** — `bcb8cf9` 의 누락된 `docs/updates/<hash>.md` + INDEX row 소급 보강
+3. **`0cf8218`** — forge 자체 결함 보강: 컨벤션 enforce
+   - `CLAUDE.md` Work Protocol 7번 추가
+   - `.claude/hooks/pre-commit-updates-doc-check.sh` (PreToolUse hook) 신설
+   - escape: `HARNESS_SKIP_UPDATE_DOC_CHECK=1` (parent env 만, inline 불가)
+4. **`e038f9c` + `6efaa24`** — forge-deploy 자동화 hook 복구
+   - 진단: `$TOOL_INPUT` placeholder 미확장으로 forge `4d02f86` 이후 silent
+   - 실제 입력: stdin JSON payload (Claude Code 표준)
+   - fix: `post-push-deploy.sh` + `pre-commit-updates-doc-check.sh` 둘 다 stdin 우선 + jq 추출
+   - 검증: target repo 에 `a0ca1fb chore: template update from harness-forge (6efaa24)` 자동 commit 발생
+
+## 다음 세션 시 활성화
+
+- `pre-commit-updates-doc-check.sh` hook 은 **다음 세션 시작 시** settings.local.json reload 로 활성. 본 세션에선 등록만 됨.
+- 검증법: 다음 세션에서 `src/` 의 임의 파일 1개만 stage 하고 `git commit` 시도 → "src/ change without companion update doc" block 메시지가 나와야 정상.
+
+## 의도적 미해결 / follow-up
+
+- forge-deploy 가 src/ 변경 없는 commit 에도 target 에 timestamp-only commit 을 만듦 (`.harness-version` 갱신 1건). 추적성은 좋지만 noise. 별도 검토.
+- multi-repo workspace 의 develop-noop guard 확장.
+- "병렬 spawn 자식이 silent 0 종료" 더 깊은 root cause 추적 (honbabseoul `/tmp/honbabseoul-run/1-20260425-133941/task-slice-3/` 로그 보존).
+- handoff/latest.md 길이 (현재 870+ 줄) — 별도 archive 정리 필요.
+
+---
+
 # Handoff — 2026-04-24 PM-9 (Phase 2 — auto-apply)
 
 ## What Changed (PM-9)
