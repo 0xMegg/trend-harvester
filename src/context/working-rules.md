@@ -50,6 +50,7 @@ Compaction induces "context anxiety," causing the model to rush toward wrapping 
 - If 3+ different approaches fail, stop and discuss
 - Flag security concerns immediately
 - State assumptions explicitly
+- For **high-stakes ambiguity** (architecture choice, destructive operation with unclear scope, plan contradiction), follow `.claude/rules/base/decision-protocol.md` — STOP, name it in one sentence, present 2–3 options with tradeoffs, ask the user. Routine work is exempt.
 
 ## Quality Gates (before declaring done)
 - [ ] Lint/Analyze passes

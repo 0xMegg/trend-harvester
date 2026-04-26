@@ -42,6 +42,13 @@ HANDOFF_FILE="handoff/latest.md"
 NO_COMMIT=false
 DRY_RUN=false
 MAX_ITER=1
+# PHASE_MODE: which phases to run. "all" runs the full Plan→Develop→Review
+# pipeline (default, backward-compatible). "plan" / "develop" / "review" run
+# a single phase so each invocation fits inside Claude Code's 10-minute Bash
+# tool timeout — divebase Task 52.1 was killed mid-run because the monolithic
+# call exceeded that limit. Single-phase callers reuse $STATUS_FILE for state.
+PHASE_MODE="all"
+RESUME_MODE=false
 
 while [ $# -gt 0 ]; do
   case "${1:-}" in
@@ -63,6 +70,18 @@ while [ $# -gt 0 ]; do
       MAX_ITER="${2:-}"
       shift 2
       ;;
+    --phase)
+      PHASE_MODE="${2:-all}"
+      shift 2
+      ;;
+    --phase=*)
+      PHASE_MODE="${1#--phase=}"
+      shift
+      ;;
+    --resume)
+      RESUME_MODE=true
+      shift
+      ;;
     --)
       shift
       break
@@ -73,6 +92,14 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+case "$PHASE_MODE" in
+  all|plan|develop|review) ;;
+  *)
+    echo "Error: --phase must be one of: all, plan, develop, review (got: $PHASE_MODE)" >&2
+    exit 1
+    ;;
+esac
+
 if ! [[ "$MAX_ITER" =~ ^[0-9]+$ ]] || [ "$MAX_ITER" -lt 1 ]; then
   echo "Error: --max-iter must be a positive integer (got: $MAX_ITER)"
   exit 1
@@ -80,12 +107,16 @@ fi
 
 TASK="$*"
 
-if [ -z "$TASK" ]; then
-  echo "Usage: $0 [--task-id <id>] [--no-commit] [--dry-run] [--max-iter N] <task description>"
+# In --resume mode the task description is recovered from $STATUS_FILE below,
+# so empty $TASK is allowed here. Other modes still require it up-front.
+if [ -z "$TASK" ] && [ "$RESUME_MODE" != true ]; then
+  echo "Usage: $0 [--task-id <id>] [--no-commit] [--dry-run] [--max-iter N] [--phase plan|develop|review|all] [--resume] <task description>"
   echo "Example: $0 Task 1 — Fix empty form submission bug in signup"
   echo "Example: $0 --task-id slice-1 Task 1 — Signup form"
   echo "Example: $0 --max-iter 3 Task 1 — Login UI (iterate up to 3 times)"
   echo "Example: $0 --dry-run Task 1 — Smoke test (no tokens spent)"
+  echo "Example: $0 --phase plan Task 52.1 — split run (avoids 10-min Bash tool timeout)"
+  echo "Example: $0 --resume Task 52.1 — pick up where the previous run left off"
   exit 1
 fi
 
@@ -427,7 +458,7 @@ log_task_entry() {
   local elapsed_str="0:00"
   if [ -f "$STATUS_FILE" ]; then
     local _start_epoch
-    _start_epoch=$(grep '^START_EPOCH=' "$STATUS_FILE" | tail -1 | sed "s/^START_EPOCH=//; s/^'//; s/'$//")
+    _start_epoch=$(grep '^START_EPOCH=' "$STATUS_FILE" 2>/dev/null | tail -1 | sed "s/^START_EPOCH=//; s/^'//; s/'$//" || true)
     if [ -n "$_start_epoch" ]; then
       local _now_epoch
       _now_epoch=$(date +%s)
@@ -609,9 +640,15 @@ run_claude() {
 # ============================================================
 dry_run_write_artifacts() {
   local phase="$1"
-  # Extract "Task N" from $TASK description for file naming; fallback to dry-run
+  # Extract task/slice number from $TASK description for file naming; fallback
+  # to "dryrun". Recognises both "Task N" and "Slice N(.M)" forms so Epic-mode
+  # callers (which pass slice descriptions) do not get coerced into "dryrun".
+  # `|| true` absorbs grep no-match so `set -euo pipefail` does not abort here.
   local task_num
-  task_num=$(echo "$TASK" | grep -oE "[Tt]ask[[:space:]]+[0-9]+" | grep -oE "[0-9]+" | head -1)
+  task_num=$(printf '%s' "$TASK" \
+    | grep -oE "([Tt]ask|[Ss]lice)[[:space:]]+[0-9]+(\.[0-9]+)?" \
+    | grep -oE "[0-9]+(\.[0-9]+)?" \
+    | head -1 || true)
   task_num="${task_num:-dryrun}"
 
   local plan_file="$PROJECT_DIR/outputs/plans/task-${task_num}-plan.md"
@@ -727,51 +764,140 @@ if [ "$DRY_RUN" = true ]; then
 fi
 
 # ============================================================
+# Resume — recover $TASK and pick the next PHASE_MODE from $STATUS_FILE
+# so a crash mid-pipeline does not force the user to re-run earlier phases.
+# Avoids the divebase Task 52.1 fallout where Plan + Develop succeeded but
+# the 10-min Bash timeout killed the script before Review could launch.
+# ============================================================
+if [ "$RESUME_MODE" = true ]; then
+  if [ ! -f "$STATUS_FILE" ]; then
+    echo -e "${RED}Error: --resume requires $STATUS_FILE (no prior run found)${NC}" >&2
+    exit 1
+  fi
+  # shellcheck disable=SC1090
+  ( source "$STATUS_FILE"; printf 'TASK=%s\nROLE=%s\nVERDICT=%s\n' \
+      "${TASK_NAME:-}" "${ROLE:-}" "${VERDICT:-}" ) > "${STATUS_FILE}.resume.$$"
+  _resume_task=$(grep '^TASK=' "${STATUS_FILE}.resume.$$" | sed 's/^TASK=//')
+  _resume_role=$(grep '^ROLE=' "${STATUS_FILE}.resume.$$" | sed 's/^ROLE=//')
+  _resume_verdict=$(grep '^VERDICT=' "${STATUS_FILE}.resume.$$" | sed 's/^VERDICT=//')
+  rm -f "${STATUS_FILE}.resume.$$"
+
+  [ -z "$TASK" ] && TASK="$_resume_task"
+  if [ -z "$TASK" ]; then
+    echo -e "${RED}Error: --resume cannot recover TASK from status file${NC}" >&2
+    exit 1
+  fi
+
+  case "$_resume_role" in
+    plan)        PHASE_MODE="develop" ;;
+    develop)     PHASE_MODE="review"  ;;
+    review|done)
+      # Already past review — re-run review only. APPROVE just finalises again
+      # (idempotent push), other verdicts let the user retry the review pass.
+      PHASE_MODE="review"
+      ;;
+    failed)
+      echo -e "${RED}Error: previous run failed (VERDICT=${_resume_verdict:-?}). Inspect ${LOG_DIR}/ and resolve manually before --resume.${NC}" >&2
+      exit 1
+      ;;
+    *)
+      echo -e "${YELLOW}WARN: unknown ROLE='${_resume_role}' in status file — running full pipeline${NC}" >&2
+      PHASE_MODE="all"
+      ;;
+  esac
+  echo -e "${CYAN}[resume] last role=${_resume_role:-?} verdict=${_resume_verdict:-?} → PHASE_MODE=${PHASE_MODE} TASK=${TASK}${NC}"
+  unset _resume_task _resume_role _resume_verdict
+fi
+
+# ============================================================
 # Set up task branch before any work (standalone mode only)
 # ============================================================
 setup_task_branch
 
 # ============================================================
 # Initialize status file (inherits EPIC_NAME/TASK_INDEX/TASK_TOTAL from env
-# when launched by run-epic.sh; otherwise runs in standalone task mode)
+# when launched by run-epic.sh; otherwise runs in standalone task mode).
+# Resume preserves the original START_EPOCH so elapsed-time stays cumulative.
 # ============================================================
-write_status \
-  "TASK_NAME=${TASK}" \
-  "TASK_ID=${TASK_ID:-}" \
-  "EPIC_NAME=${EPIC_NAME:-}" \
-  "TASK_INDEX=${TASK_INDEX:-}" \
-  "TASK_TOTAL=${TASK_TOTAL:-}" \
-  "ROLE=init" \
-  "ITER=1" \
-  "MAX_ITER=${MAX_ITER}" \
-  "VERDICT=" \
-  "START_EPOCH=$(date +%s)" \
-  "PID=$$"
-
-# ============================================================
-# Phase 1: Plan
-# ============================================================
-write_status "ROLE=plan" "ITER=1"
-log_phase "PHASE 1/3: PLAN"
-
-if ! run_claude "plan" "/plan $TASK"; then
-  log_fail "Plan phase failed. Check ${LOG_DIR}/plan.log"
-  write_status "ROLE=failed" "VERDICT=PLAN_FAILED"
-  log_task_entry
-  exit 1
+if [ "$RESUME_MODE" = true ] && [ -f "$STATUS_FILE" ]; then
+  write_status \
+    "TASK_NAME=${TASK}" \
+    "ROLE=resuming" \
+    "VERDICT="
+else
+  write_status \
+    "TASK_NAME=${TASK}" \
+    "TASK_ID=${TASK_ID:-}" \
+    "EPIC_NAME=${EPIC_NAME:-}" \
+    "TASK_INDEX=${TASK_INDEX:-}" \
+    "TASK_TOTAL=${TASK_TOTAL:-}" \
+    "ROLE=init" \
+    "ITER=1" \
+    "MAX_ITER=${MAX_ITER}" \
+    "VERDICT=" \
+    "START_EPOCH=$(date +%s)" \
+    "PID=$$"
 fi
 
-log_success "Plan phase complete"
+echo -e "${CYAN}[phase-mode] ${PHASE_MODE}${NC}"
+
+# ============================================================
+# Phase 1: Plan (skipped unless PHASE_MODE = all|plan)
+# ============================================================
+if [ "$PHASE_MODE" = "all" ] || [ "$PHASE_MODE" = "plan" ]; then
+  write_status "ROLE=plan" "ITER=1"
+  log_phase "PHASE 1/3: PLAN"
+
+  if ! run_claude "plan" "/plan $TASK"; then
+    log_fail "Plan phase failed. Check ${LOG_DIR}/plan.log"
+    write_status "ROLE=failed" "VERDICT=PLAN_FAILED"
+    log_task_entry
+    exit 1
+  fi
+
+  log_success "Plan phase complete"
+fi
+
+# Plan-only mode terminates here. The next call (typically
+# `run-task.sh --phase develop "$TASK"`) picks up from the produced plan file.
+if [ "$PHASE_MODE" = "plan" ]; then
+  write_status "ROLE=plan" "VERDICT=PLAN_DONE"
+  log_task_entry
+  echo ""
+  echo -e "${GREEN}════════════════════════════════════════${NC}"
+  echo -e "${GREEN}  PLAN PHASE COMPLETE — exit early (--phase=plan)${NC}"
+  echo -e "${GREEN}  Next: $0 --phase develop \"$TASK\"${NC}"
+  echo -e "${GREEN}════════════════════════════════════════${NC}"
+  exit 0
+fi
 
 # ============================================================
 # Phase 2-3: Develop → Review (with iteration loop)
+# In --phase=review mode, the Develop block is skipped and the loop runs once.
 # ============================================================
 ITER=1
 VERDICT=""
+EFFECTIVE_MAX_ITER="$MAX_ITER"
+case "$PHASE_MODE" in
+  review|develop) EFFECTIVE_MAX_ITER=1 ;;
+esac
 
-while [ "$ITER" -le "$MAX_ITER" ]; do
-  # --- Develop ---
-  write_status "ROLE=develop" "ITER=${ITER}"
+while [ "$ITER" -le "$EFFECTIVE_MAX_ITER" ]; do
+  # --phase=review skips Develop entirely — the working tree is assumed to
+  # carry the prior Develop output already.
+  if [ "$PHASE_MODE" = "review" ]; then
+    write_status "ROLE=review" "ITER=${ITER}"
+    log_phase "PHASE 3/3: REVIEW (review-only mode)"
+    REVIEW_LOG="${LOG_DIR}/review-iter${ITER}.log"
+    if ! run_claude "review-iter${ITER}" "/review $TASK"; then
+      log_fail "Review phase failed. Check ${REVIEW_LOG}"
+      write_status "ROLE=failed" "VERDICT=REVIEW_FAILED"
+      log_task_entry
+      exit 1
+    fi
+  else
+    # --- Develop ---
+    write_status "ROLE=develop" "ITER=${ITER}"
   if [ "$ITER" -eq 1 ]; then
     log_phase "PHASE 2/3: DEVELOP"
     DEVELOP_PROMPT="/develop $TASK"
@@ -825,7 +951,15 @@ while [ "$ITER" -le "$MAX_ITER" ]; do
       fi
       git -C "$PROJECT_DIR" status --porcelain 2>/dev/null | awk '{print $NF}'
     } | sort -u | sed '/^$/d' )
-    _scope_task_num=$(echo "$TASK" | grep -oE "[Tt]ask[[:space:]]+[0-9]+" | grep -oE "[0-9]+" | head -1)
+    # Extract task/slice number from $TASK. Earlier forms only matched "Task N",
+    # which made Epic-mode callers (TASK="Slice 1: foo") fail under
+    # `set -euo pipefail` because grep no-match exited 1 and aborted the
+    # whole script before PHASE 3/3 REVIEW could run (honbabseoul Epic 3).
+    # Recognise both forms and tolerate no-match via `|| true`.
+    _scope_task_num=$(printf '%s' "$TASK" \
+      | grep -oE "([Tt]ask|[Ss]lice)[[:space:]]+[0-9]+(\.[0-9]+)?" \
+      | grep -oE "[0-9]+(\.[0-9]+)?" \
+      | head -1 || true)
     _scope_plan_file="$PROJECT_DIR/outputs/plans/task-${_scope_task_num:-unknown}-plan.md"
     _scope_planned=""
     if [ -n "$_scope_task_num" ] && [ -f "$_scope_plan_file" ]; then
@@ -855,6 +989,20 @@ while [ "$ITER" -le "$MAX_ITER" ]; do
     unset _scope_changed _scope_task_num _scope_plan_file _scope_planned _scope_unplanned _post_head
   fi
 
+  # Develop-only mode terminates here so the next call (typically
+  # `run-task.sh --phase review "$TASK"`) can run the review pass inside
+  # a fresh 10-min Bash tool window.
+  if [ "$PHASE_MODE" = "develop" ]; then
+    write_status "ROLE=develop" "VERDICT=DEVELOP_DONE"
+    log_task_entry
+    echo ""
+    echo -e "${GREEN}════════════════════════════════════════${NC}"
+    echo -e "${GREEN}  DEVELOP PHASE COMPLETE — exit early (--phase=develop)${NC}"
+    echo -e "${GREEN}  Next: $0 --phase review \"$TASK\"${NC}"
+    echo -e "${GREEN}════════════════════════════════════════${NC}"
+    exit 0
+  fi
+
   # --- Review ---
   write_status "ROLE=review" "ITER=${ITER}"
   if [ "$ITER" -eq 1 ]; then
@@ -870,6 +1018,7 @@ while [ "$ITER" -le "$MAX_ITER" ]; do
     log_task_entry
     exit 1
   fi
+  fi  # end: $PHASE_MODE branching (review-only vs develop+review)
 
   # Check verdict — search only the tail of the review log to avoid
   # false positives from earlier context (e.g. "fixed previous REQUEST_CHANGES").

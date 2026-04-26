@@ -25,6 +25,20 @@ if [ ! -d "$SRC_DIR" ]; then
   exit 1
 fi
 
+# Pre-build regression gate — catches `set -euo pipefail` traps and grep
+# no-match aborts (e.g. honbabseoul Epic 3 scope-leak grep) before they
+# reach downstream projects via upgrade-harness. Bypass via
+# SKIP_REGRESSION_CHECK=1 only for emergency hotfix builds.
+if [ "${SKIP_REGRESSION_CHECK:-0}" != "1" ] \
+   && [ -x "$SRC_DIR/scripts/check-harness-regression.sh" ]; then
+  echo -e "${CYAN}Running regression gate...${NC}"
+  if ! bash "$SRC_DIR/scripts/check-harness-regression.sh"; then
+    echo -e "${RED}✗ Regression gate failed — refusing to build${NC}"
+    echo -e "${YELLOW}  Fix reported issues, or set SKIP_REGRESSION_CHECK=1 to bypass (emergency only)${NC}"
+    exit 1
+  fi
+fi
+
 echo -e "${CYAN}Building harness template...${NC}"
 echo "  Source: $SRC_DIR"
 echo "  Output: $OUT_DIR"

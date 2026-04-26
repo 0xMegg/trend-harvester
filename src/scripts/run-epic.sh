@@ -895,10 +895,15 @@ commit_stage() {
   for _vc_idx in "${indices[@]}"; do
     local _vc_desc="${SLICES[$_vc_idx]}"
     local _vc_num
-    _vc_num=$(echo "$_vc_desc" | grep -oE "[Tt]ask[[:space:]]+[0-9]+" | grep -oE "[0-9]+" | head -1)
-    if [ -z "$_vc_num" ]; then
-      _vc_num=$(echo "$_vc_desc" | grep -oE "[Ss]lice[[:space:]]+[0-9]+(\.[0-9]+)?" | grep -oE "[0-9]+(\.[0-9]+)?" | head -1)
-    fi
+    # Recognise both "Task N" and "Slice N(.M)" in one pass. Earlier the two
+    # forms were two separate command substitutions and the first (Task) one
+    # could exit 1 under `set -euo pipefail` when the slice description had
+    # no "Task" prefix, aborting the whole script before reaching the Slice
+    # fallback. Combined regex + `|| true` makes this trap-free.
+    _vc_num=$(printf '%s' "$_vc_desc" \
+      | grep -oE "([Tt]ask|[Ss]lice)[[:space:]]+[0-9]+(\.[0-9]+)?" \
+      | grep -oE "[0-9]+(\.[0-9]+)?" \
+      | head -1 || true)
     local _vc_review=""
     if [ -n "$_vc_num" ]; then
       for _vc_cand in \
@@ -914,7 +919,7 @@ commit_stage() {
     fi
     if ! grep -q '<!-- FINAL_VERDICT: APPROVE -->' "$_vc_review" 2>/dev/null; then
       local _vc_marker
-      _vc_marker=$(grep -oE '<!-- FINAL_VERDICT: [A-Z_]+ -->' "$_vc_review" 2>/dev/null | tail -1)
+      _vc_marker=$(grep -oE '<!-- FINAL_VERDICT: [A-Z_]+ -->' "$_vc_review" 2>/dev/null | tail -1 || true)
       _vc_marker="${_vc_marker:-<no marker>}"
       _vc_not_approved+=("$(basename "$_vc_review") — ${_vc_marker}")
     fi

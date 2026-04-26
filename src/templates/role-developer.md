@@ -92,6 +92,27 @@ This rule especially applies to: RLS / RBAC policies, security constraints,
 build-time guards (e.g. `import "server-only"`), database constraints, and
 anything labelled "defense-in-depth" in the plan.
 
+## Slice Sizing — Beat the 10-Minute Tool Timeout
+Claude Code's Bash tool kills any single invocation after 10 minutes. The
+orchestrator (`run-task.sh`) runs Plan + Develop + Review in one process and
+divebase Task 52.1 was SIGTERM'd at ~18 min — Plan and Develop completed but
+Review never launched.
+
+When sizing a slice or task:
+1. Estimate Develop time honestly. If a single Develop pass plausibly exceeds
+   ~7 minutes (large refactor, multi-file migration, slow test suite), split
+   the slice further before the Planner finalises the plan.
+2. If you are mid-Develop and approaching the limit, stop, write what you
+   have to handoff, and let the Reviewer pick up — do NOT race to finish.
+3. For long jobs that resist further splitting, the operator should run
+   `run-plan.sh` / `run-develop.sh` / `run-review.sh` separately so each
+   call gets its own 10-min window. This is documented in
+   `scripts/run-task.sh --help`; flag the need explicitly in the handoff.
+
+The orchestrator also supports `run-task.sh --resume` to pick up where a
+previous run died. If you see a SIGTERM-killed run, prefer `--resume` over
+re-running everything.
+
 ## Long-Running Process Hygiene
 Dev servers, file watchers, tunnels, and similar long-lived processes used
 for UI/API verification MUST be:
