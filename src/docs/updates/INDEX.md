@@ -10,7 +10,7 @@ forge src/ 에서 다운스트림으로 전파되는 모든 변경의 연대기.
 
 | Date | Hash | Severity | Type | Title | Breaking |
 |------|------|----------|------|-------|----------|
-| 2026-04-26 | [round-3-fixes](./round-3-fixes.md) | P0 | fix | forge round 3 — scope-leak grep regression + phase split + resume + regression gate + decision protocol | no |
+| 2026-04-26 | [e2ee114](./e2ee114.md) | P0 | fix | forge round 3 — scope-leak grep regression + phase split + resume + regression gate + decision protocol | no |
 | 2026-04-25 | [8a8f0d5](./8a8f0d5.md) | P0 | fix | forge round 2 — empirical-first / scope-leak / verdict cross-check / spec invariant grep | no |
 | 2026-04-25 | [24070b5](./24070b5.md) | P0 | fix | divebase forge-feedback 5건 (monitoring prompt 폭주 / placeholder 치환 / 옛 root rules 정리) | no |
 | 2026-04-25 | [bcb8cf9](./bcb8cf9.md) | P0 | fix | bash3 compat + develop-noop guard + install-before-import rule | no |
