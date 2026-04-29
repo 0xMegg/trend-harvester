@@ -10,6 +10,7 @@ forge src/ 에서 다운스트림으로 전파되는 모든 변경의 연대기.
 
 | Date | Hash | Severity | Type | Title | Breaking |
 |------|------|----------|------|-------|----------|
+| 2026-04-29 | [round-5-operating-mode](./round-5-operating-mode.md) | P2 | feat | forge round 5 — Operating Mode template + meta-backlog 단일 위치 | no |
 | 2026-04-29 | [cee3b30](./cee3b30.md) | P0 | fix | round 4 P0 — upgrade-harness scoped PROJECT_NAME substitution + missing phase wrapper manifest entries | no |
 | 2026-04-26 | [e2ee114](./e2ee114.md) | P0 | fix | forge round 3 — scope-leak grep regression + phase split + resume + regression gate + decision protocol | no |
 | 2026-04-25 | [8a8f0d5](./8a8f0d5.md) | P0 | fix | forge round 2 — empirical-first / scope-leak / verdict cross-check / spec invariant grep | no |

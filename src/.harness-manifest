@@ -63,6 +63,7 @@ docs/epic-guide.md
 docs/plugin-guide.md
 docs/troubleshooting.md
 docs/assumptions.md
+docs/operating-mode-template.md
 
 # Update changelog (per-commit update docs, INDEX, convention README)
 # Consumed by Phase 2 auto-apply to summarize what's being applied.
